@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 from typing import Any
 
@@ -10,6 +10,7 @@ from scripts.query_postgres import (
     build_search_response,
     get_series_observations_by_indicator,
     get_series_summary_by_indicator,
+    list_datasets,
     search_series,
 )
 
@@ -55,6 +56,14 @@ HOME_PAGE_HTML = """
       margin: 14px 0;
     }
 
+    .dataset-summary {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 18px 0;
+      background: #fafafa;
+    }
+
     .code {
       font-family: monospace;
       background: #f5f5f5;
@@ -73,6 +82,10 @@ HOME_PAGE_HTML = """
   <p>
     Search public ONS/IMF SDMX series metadata.
   </p>
+
+  <div id="dataset-summary" class="dataset-summary">
+    Loading available datasets...
+  </div>
 
   <form id="search-form">
     <input
@@ -95,6 +108,63 @@ HOME_PAGE_HTML = """
     const form = document.getElementById("search-form");
     const input = document.getElementById("search-input");
     const resultsDiv = document.getElementById("results");
+    const datasetSummaryDiv = document.getElementById("dataset-summary");
+
+    function externalLink(url, label) {
+      if (!url) {
+        return "";
+      }
+
+      return `
+        |
+        <a href="${url}" target="_blank" rel="noopener noreferrer">
+          ${label}
+        </a>
+      `;
+    }
+
+    async function loadDatasetSummary() {
+      const response = await fetch("/v1/datasets");
+
+      if (!response.ok) {
+        datasetSummaryDiv.innerHTML = "<p>Could not load dataset summary.</p>";
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.datasets.length === 0) {
+        datasetSummaryDiv.innerHTML = "<p>No datasets are currently loaded.</p>";
+        return;
+      }
+
+      datasetSummaryDiv.innerHTML = `
+        <h2>Available datasets</h2>
+        ${data.datasets.map(dataset => `
+          <p>
+            <strong>${dataset.dataset_id}</strong>
+            ${dataset.dataset_title ? `— ${dataset.dataset_title}` : ""}
+          </p>
+
+          <p>
+            Series: ${dataset.series_count}
+            |
+            Observations: ${dataset.observation_count}
+            |
+            Structure:
+            <span class="code">${dataset.structure_ref}</span>
+          </p>
+
+          <p>
+            <a href="${dataset.source_url}" target="_blank" rel="noopener noreferrer">
+              Official SDMX source
+            </a>
+            ${externalLink(dataset.documentation_url, "ONS documentation")}
+            ${externalLink(dataset.metadata_url, "IMF metadata")}
+          </p>
+        `).join("")}
+      `;
+    }
 
     async function runSearch(query) {
       resultsDiv.innerHTML = "<p>Searching...</p>";
@@ -115,18 +185,27 @@ HOME_PAGE_HTML = """
       }
 
       resultsDiv.innerHTML = `
-        <h2>Results for “${data.query}”</h2>
+        <h2>Results for "${data.query}"</h2>
         ${data.results.map(result => `
           <div class="result">
             <h3>${result.indicator_name}</h3>
+
             <p>
               Indicator:
               <span class="code">${result.indicator_code}</span>
             </p>
+
             <p>
               Dataset:
               <span class="code">${result.dataset_id}</span>
+              ${result.dataset_title ? `— ${result.dataset_title}` : ""}
             </p>
+
+            <p>
+              Structure:
+              <span class="code">${result.structure_ref}</span>
+            </p>
+
             <p>
               Frequency: ${result.frequency_name}
               |
@@ -134,6 +213,7 @@ HOME_PAGE_HTML = """
               |
               Observations: ${result.observation_count}
             </p>
+
             <p>
               <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}" target="_blank">
                 View metadata JSON
@@ -142,6 +222,9 @@ HOME_PAGE_HTML = """
               <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}/observations?limit=5" target="_blank">
                 View first 5 observations JSON
               </a>
+              ${externalLink(result.source_url, "Official SDMX source")}
+              ${externalLink(result.documentation_url, "ONS documentation")}
+              ${externalLink(result.metadata_url, "IMF metadata")}
             </p>
           </div>
         `).join("")}
@@ -153,6 +236,7 @@ HOME_PAGE_HTML = """
       runSearch(input.value);
     });
 
+    loadDatasetSummary();
     runSearch(input.value);
   </script>
 </body>
@@ -178,6 +262,19 @@ def health_check() -> dict[str, str]:
     This proves the API server is running.
     """
     return {"status": "ok"}
+
+
+@app.get("/v1/datasets")
+def list_datasets_endpoint() -> dict[str, Any]:
+    """
+    Return datasets currently available in this prototype.
+    """
+    rows = list_datasets()
+
+    return {
+        "count": len(rows),
+        "datasets": rows,
+    }
 
 
 @app.get("/v1/series/search")

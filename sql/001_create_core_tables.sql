@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS datasets (
     dataset_id TEXT PRIMARY KEY,
     title TEXT,
     source_url TEXT NOT NULL,
+    documentation_url TEXT,
+    metadata_url TEXT,
     structure_ref TEXT,
     raw_file_path TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

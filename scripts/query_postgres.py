@@ -49,27 +49,74 @@ def print_json(data: Any) -> None:
     print(json.dumps(data, indent=2, default=str))
 
 
+def list_datasets() -> list[dict[str, Any]]:
+    """
+    Return datasets currently loaded into the local database.
+
+    This helps the API and homepage explain what data is available.
+    """
+    sql = """
+        SELECT
+            d.dataset_id,
+            d.title AS dataset_title,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref,
+            COUNT(DISTINCT s.series_id) AS series_count,
+            COUNT(o.observation_id) AS observation_count
+        FROM datasets d
+        LEFT JOIN series s
+            ON s.dataset_id = d.dataset_id
+        LEFT JOIN observations o
+            ON o.series_id = s.series_id
+        GROUP BY
+            d.dataset_id,
+            d.title,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref
+        ORDER BY
+            d.dataset_id;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
 def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
     """
-    Search for series whose search_text contains all query terms.
+    Search for series using search_text.
 
-    This is simple keyword search, backed by Postgres.
+    This is currently literal metadata search: user terms must match the
+    official parsed metadata text.
     """
     terms = split_query_terms(query)
 
     if not terms:
         return []
 
-    where_clauses = ["s.search_text ILIKE %s" for _ in terms]
-    where_sql = " AND ".join(where_clauses)
+    where_clauses = []
+    params: list[Any] = []
 
-    params: list[Any] = [f"%{term}%" for term in terms]
-    params.append(limit)
+    for term in terms:
+        where_clauses.append("s.search_text ILIKE %s")
+        params.append(f"%{term}%")
+
+    where_sql = " AND ".join(where_clauses)
 
     sql = f"""
         SELECT
             s.series_id,
             s.dataset_id,
+            d.title AS dataset_title,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref,
             s.dimension_values ->> 'INDICATOR' AS indicator_code,
             s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
             s.dimension_values ->> 'FREQ' AS frequency_code,
@@ -78,25 +125,35 @@ def search_series(query: str, limit: int = 10) -> list[dict[str, Any]]:
             MAX(o.time_period) AS latest_period,
             COUNT(o.observation_id) AS observation_count
         FROM series s
+        JOIN datasets d
+            ON d.dataset_id = s.dataset_id
         LEFT JOIN observations o
             ON o.series_id = s.series_id
         WHERE {where_sql}
         GROUP BY
             s.series_id,
             s.dataset_id,
+            d.title,
+            d.source_url,
+            d.documentation_url,
+            d.metadata_url,
+            d.structure_ref,
             s.dimension_values ->> 'INDICATOR',
             s.dimension_labels -> 'INDICATOR' ->> 'name',
             s.dimension_values ->> 'FREQ',
             s.dimension_labels -> 'FREQ' ->> 'name'
         ORDER BY
+            observation_count DESC,
             s.series_id
         LIMIT %s;
     """
 
+    params.append(limit)
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            return list(cur.fetchall())
+            return cur.fetchall()
 
 
 def get_series_summary(series_id: int) -> dict[str, Any] | None:
@@ -151,6 +208,8 @@ def get_series_summary_by_indicator(
             s.dataset_id,
             d.title AS dataset_title,
             d.source_url,
+            d.documentation_url,
+            d.metadata_url,
             d.structure_ref,
             s.series_key,
             s.dimension_values,
@@ -174,6 +233,8 @@ def get_series_summary_by_indicator(
             s.dataset_id,
             d.title,
             d.source_url,
+            d.documentation_url,
+            d.metadata_url,
             d.structure_ref,
             s.series_key,
             s.dimension_values,
