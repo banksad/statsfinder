@@ -134,6 +134,53 @@ def get_series_summary(series_id: int) -> dict[str, Any] | None:
             cur.execute(sql, (series_id,))
             return cur.fetchone()
 
+def get_series_summary_by_indicator(
+    dataset_id: str,
+    indicator_code: str,
+) -> dict[str, Any] | None:
+    """
+    Return one detailed summary row for a series identified by dataset_id
+    and indicator code.
+
+    This is more public-user-friendly than requiring the internal series_id,
+    while still exposing SDMX-derived metadata.
+    """
+    sql = """
+        SELECT
+            s.series_id,
+            s.dataset_id,
+            s.series_key,
+            s.dimension_values,
+            s.dimension_labels,
+            s.dimension_values ->> 'INDICATOR' AS indicator_code,
+            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            s.dimension_values ->> 'FREQ' AS frequency_code,
+            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
+            MIN(o.time_period) AS first_period,
+            MAX(o.time_period) AS latest_period,
+            COUNT(o.observation_id) AS observation_count
+        FROM series s
+        LEFT JOIN observations o
+            ON o.series_id = s.series_id
+        WHERE s.dataset_id = %s
+          AND s.dimension_values ->> 'INDICATOR' = %s
+        GROUP BY
+            s.series_id,
+            s.dataset_id,
+            s.series_key,
+            s.dimension_values,
+            s.dimension_labels,
+            s.dimension_values ->> 'INDICATOR',
+            s.dimension_labels -> 'INDICATOR' ->> 'name',
+            s.dimension_values ->> 'FREQ',
+            s.dimension_labels -> 'FREQ' ->> 'name';
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (dataset_id, indicator_code))
+            return cur.fetchone()
+
 
 def get_series_observations(
     series_id: int,
@@ -155,6 +202,33 @@ def get_series_observations(
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (series_id, limit))
+            return list(cur.fetchall())
+
+
+def get_series_observations_by_indicator(
+    dataset_id: str,
+    indicator_code: str,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """
+    Return observation rows for a series identified by dataset_id and indicator code.
+    """
+    sql = """
+        SELECT
+            o.time_period,
+            o.obs_value
+        FROM observations o
+        JOIN series s
+            ON o.series_id = s.series_id
+        WHERE s.dataset_id = %s
+          AND s.dimension_values ->> 'INDICATOR' = %s
+        ORDER BY o.time_period
+        LIMIT %s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (dataset_id, indicator_code, limit))
             return list(cur.fetchall())
 
 
@@ -186,6 +260,22 @@ def build_observations_response(
     """
     return {
         "series_id": series_id,
+        "limit": limit,
+        "count": len(rows),
+        "observations": rows,
+    }
+
+
+def build_observations_by_indicator_response(
+    dataset_id: str,
+    indicator_code: str,
+    limit: int,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Wrap observation rows for a public dataset/indicator identifier."""
+    return {
+        "dataset_id": dataset_id,
+        "indicator_code": indicator_code,
         "limit": limit,
         "count": len(rows),
         "observations": rows,
@@ -272,6 +362,14 @@ def build_parser() -> argparse.ArgumentParser:
     summary_parser.add_argument("series_id", type=int)
     summary_parser.add_argument("--json", action="store_true")
 
+    summary_by_indicator_parser = subparsers.add_parser(
+        "summary-by-indicator",
+        help="Show summary metadata using dataset_id and indicator code.",
+    )
+    summary_by_indicator_parser.add_argument("dataset_id")
+    summary_by_indicator_parser.add_argument("indicator_code")
+    summary_by_indicator_parser.add_argument("--json", action="store_true")
+
     observations_parser = subparsers.add_parser(
         "observations",
         help="Show observations for one series.",
@@ -279,6 +377,15 @@ def build_parser() -> argparse.ArgumentParser:
     observations_parser.add_argument("series_id", type=int)
     observations_parser.add_argument("--limit", type=int, default=10)
     observations_parser.add_argument("--json", action="store_true")
+
+    observations_by_indicator_parser = subparsers.add_parser(
+        "observations-by-indicator",
+        help="Show observations using dataset_id and indicator code.",
+    )
+    observations_by_indicator_parser.add_argument("dataset_id")
+    observations_by_indicator_parser.add_argument("indicator_code")
+    observations_by_indicator_parser.add_argument("--limit", type=int, default=10)
+    observations_by_indicator_parser.add_argument("--json", action="store_true")
 
     return parser
 
@@ -303,6 +410,17 @@ def main() -> None:
         else:
             print_summary(row)
 
+    elif args.command == "summary-by-indicator":
+        row = get_series_summary_by_indicator(
+            args.dataset_id,
+            args.indicator_code,
+        )
+
+        if args.json:
+            print_json(row)
+        else:
+            print_summary(row)
+
     elif args.command == "observations":
         rows = get_series_observations(args.series_id, args.limit)
 
@@ -310,6 +428,25 @@ def main() -> None:
             print_json(
                 build_observations_response(
                     args.series_id,
+                    args.limit,
+                    rows,
+                )
+            )
+        else:
+            print_observations(rows)
+
+    elif args.command == "observations-by-indicator":
+        rows = get_series_observations_by_indicator(
+            args.dataset_id,
+            args.indicator_code,
+            args.limit,
+        )
+
+        if args.json:
+            print_json(
+                build_observations_by_indicator_response(
+                    args.dataset_id,
+                    args.indicator_code,
                     args.limit,
                     rows,
                 )
