@@ -9,21 +9,26 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from scripts.dataset_registry import get_dataset_config
+
 
 DB_DSN = os.environ.get(
     "ONS_SDMX_DB_DSN",
     "postgresql://ons_sdmx_user:ons_sdmx_password@localhost:5433/ons_sdmx",
 )
 
-SERIES_JSON_PATH = Path("data/processed/nag_series_enriched.json")
-OBSERVATIONS_JSON_PATH = Path("data/processed/nag_observation_records.json")
+DATASET_CONFIG = get_dataset_config("NAG_GBR")
 
-DATASET_ID = "NAG_GBR"
-DATASET_TITLE = "UK National Accounts"
-SOURCE_URL = "https://static.ons.gov.uk/imf/NAG_GBR.xml"
-STRUCTURE_REF = "IMF_ECOFIN_DSD_1_0"
-RAW_FILE_PATH = "data/raw/NAG_GBR.xml"
+DATASET_ID = DATASET_CONFIG["dataset_id"]
+DATASET_TITLE = DATASET_CONFIG["title"]
+SOURCE_URL = DATASET_CONFIG["source_url"]
+DOCUMENTATION_URL = DATASET_CONFIG["documentation_url"]
+METADATA_URL = DATASET_CONFIG["metadata_url"]
+STRUCTURE_REF = DATASET_CONFIG["structure_ref"]
+RAW_FILE_PATH = DATASET_CONFIG["raw_file_path"]
 
+SERIES_JSON_PATH = Path(DATASET_CONFIG["series_json_path"])
+OBSERVATIONS_JSON_PATH = Path(DATASET_CONFIG["observations_json_path"])
 
 def load_json(path: Path) -> list[dict[str, Any]]:
     """Load a JSON file that contains a list of objects."""
@@ -47,29 +52,39 @@ def parse_obs_value(value: Any) -> Decimal | None:
     return Decimal(str(value))
 
 
-def insert_dataset(cur: psycopg.Cursor) -> None:
-    """Insert or update the one dataset record for NAG_GBR."""
-    cur.execute(
-        """
+def insert_dataset(cur) -> None:
+    """
+    Insert or update the dataset metadata row.
+    """
+    sql = """
         INSERT INTO datasets (
             dataset_id,
             title,
             source_url,
+            documentation_url,
+            metadata_url,
             structure_ref,
             raw_file_path
         )
-        VALUES (%s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (dataset_id)
         DO UPDATE SET
             title = EXCLUDED.title,
             source_url = EXCLUDED.source_url,
+            documentation_url = EXCLUDED.documentation_url,
+            metadata_url = EXCLUDED.metadata_url,
             structure_ref = EXCLUDED.structure_ref,
             raw_file_path = EXCLUDED.raw_file_path;
-        """,
+    """
+
+    cur.execute(
+        sql,
         (
             DATASET_ID,
             DATASET_TITLE,
             SOURCE_URL,
+            DOCUMENTATION_URL,
+            METADATA_URL,
             STRUCTURE_REF,
             RAW_FILE_PATH,
         ),
