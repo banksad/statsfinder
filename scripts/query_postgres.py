@@ -143,12 +143,15 @@ def get_series_summary_by_indicator(
     and indicator code.
 
     This is more public-user-friendly than requiring the internal series_id,
-    while still exposing SDMX-derived metadata.
+    while still exposing SDMX-derived metadata and source provenance.
     """
     sql = """
         SELECT
             s.series_id,
             s.dataset_id,
+            d.title AS dataset_title,
+            d.source_url,
+            d.structure_ref,
             s.series_key,
             s.dimension_values,
             s.dimension_labels,
@@ -160,6 +163,8 @@ def get_series_summary_by_indicator(
             MAX(o.time_period) AS latest_period,
             COUNT(o.observation_id) AS observation_count
         FROM series s
+        JOIN datasets d
+            ON d.dataset_id = s.dataset_id
         LEFT JOIN observations o
             ON o.series_id = s.series_id
         WHERE s.dataset_id = %s
@@ -167,6 +172,9 @@ def get_series_summary_by_indicator(
         GROUP BY
             s.series_id,
             s.dataset_id,
+            d.title,
+            d.source_url,
+            d.structure_ref,
             s.series_key,
             s.dimension_values,
             s.dimension_labels,
@@ -180,7 +188,6 @@ def get_series_summary_by_indicator(
         with conn.cursor() as cur:
             cur.execute(sql, (dataset_id, indicator_code))
             return cur.fetchone()
-
 
 def get_series_observations(
     series_id: int,
