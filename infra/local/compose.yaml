@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ons-sdmx-postgres
+    environment:
+      POSTGRES_DB: ons_sdmx
+      POSTGRES_USER: ons_sdmx_user
+      POSTGRES_PASSWORD: ons_sdmx_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

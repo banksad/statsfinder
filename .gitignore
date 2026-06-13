@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local data files generated or downloaded by scripts
+data/raw/
+data/structure/
+data/processed/
+pretty/
+
+# Database / dump files
+*.sqlite
+*.db
+*.dump
+*.backup
+
+# OS/editor noise
+.DS_Store
