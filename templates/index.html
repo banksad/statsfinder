@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ONS StatsChat Lite</title>
+  <link rel="stylesheet" href="/static/styles.css">
+
+</head>
+<body>
+  <h1>ONS StatsChat Lite</h1>
+
+  <p>
+    Search public ONS/IMF SDMX series metadata.
+  </p>
+
+  <div id="dataset-summary" class="dataset-summary">
+    Loading available datasets...
+  </div>
+
+  <form id="search-form">
+    <p>
+      <label for="dataset-select">Dataset</label><br>
+      <select id="dataset-select">
+        <option value="">All datasets</option>
+      </select>
+    </p>
+
+    <p>
+      <label for="search-input">Search terms</label><br>
+      <input
+        id="search-input"
+        type="search"
+        value="real gdp"
+        placeholder="Try: real gdp, consumer price, retail price, imports"
+      >
+      <button type="submit">Search</button>
+    </p>
+  </form>
+
+  <p class="muted">
+    This page calls the local FastAPI endpoint:
+    <span class="code">/v1/series/search</span>
+  </p>
+
+  <div id="results"></div>
+
+  <script src="/static/app.js"></script>
+
+</body>
+</html>

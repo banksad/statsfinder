@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ indicator_name }} — ONS StatsChat Lite</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <p><a href="/">← Back to search</a></p>
+
+  <h1>{{ indicator_name }}</h1>
+
+  <div class="result">
+    <p>
+      Indicator:
+      <span class="code">{{ indicator_code }}</span>
+    </p>
+
+    <p>
+      Dataset:
+      <span class="code">{{ dataset_id }}</span>
+      {{ dataset_title }}
+    </p>
+
+    <p>
+      Frequency: {{ frequency_name }}
+      |
+      Period: {{ first_period }} to {{ latest_period }}
+      |
+      Observations: {{ observation_count }}
+    </p>
+
+    <p>
+      <a href="{{ metadata_url }}" target="_blank">View metadata JSON</a>
+      |
+      <a href="{{ observations_url }}" target="_blank">View first 20 observations JSON</a>
+    </p>
+  </div>
+
+  <h2>First 20 observations</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ observations_rows }}
+    </tbody>
+  </table>
+</body>
+</html>
