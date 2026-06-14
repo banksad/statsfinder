@@ -2,38 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{{ indicator_name }} — ONS StatsChat Lite</title>
+  <title>{{ summary.indicator_name }} — ONS StatsChat Lite</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <p><a href="/">← Back to search</a></p>
 
-  <h1>{{ indicator_name }}</h1>
+  <h1>{{ summary.indicator_name }}</h1>
 
   <div class="result">
     <p>
       Indicator:
-      <span class="code">{{ indicator_code }}</span>
+      <span class="code">{{ summary.indicator_code }}</span>
     </p>
 
     <p>
       Dataset:
-      <span class="code">{{ dataset_id }}</span>
-      {{ dataset_title }}
+      <span class="code">{{ summary.dataset_id }}</span>
+      {{ summary.dataset_title }}
     </p>
 
     <p>
-      Frequency: {{ frequency_name }}
+      Frequency: {{ summary.frequency_name }}
       |
-      Period: {{ first_period }} to {{ latest_period }}
+      Period: {{ summary.first_period }} to {{ summary.latest_period }}
       |
-      Observations: {{ observation_count }}
+      Observations: {{ summary.observation_count }}
     </p>
 
     <p>
-      <a href="{{ metadata_url }}" target="_blank">View metadata JSON</a>
+      <a href="{{ metadata_url }}" target="_blank" rel="noopener noreferrer">View metadata JSON</a>
       |
-      <a href="{{ observations_url }}" target="_blank">View first 20 observations JSON</a>
+      <a href="{{ observations_url }}" target="_blank" rel="noopener noreferrer">View first 20 observations JSON</a>
+      |
+      <a href="/">Homepage</a>
     </p>
   </div>
 
@@ -47,7 +49,16 @@
       </tr>
     </thead>
     <tbody>
-      {{ observations_rows }}
+      {% for observation in observations %}
+      <tr>
+        <td>{{ observation.time_period }}</td>
+        <td>{{ observation.obs_value }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="2">No observations found.</td>
+      </tr>
+      {% endfor %}
     </tbody>
   </table>
 </body>

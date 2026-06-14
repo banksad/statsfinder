@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from html import escape
 from pathlib import Path as FilePath
 from typing import Any
+from urllib.parse import quote
 
-from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from scripts.query_postgres import (
     build_observations_by_indicator_response,
@@ -30,72 +31,22 @@ app = FastAPI(
 )
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-def read_template(template_name: str) -> str:
-    return (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @app.get("/", response_class=HTMLResponse)
-def home_page() -> str:
+def home_page(request: Request) -> HTMLResponse:
     """
     Tiny browser UI for searching series metadata.
 
     This is intentionally simple: one HTML page calling our JSON API.
     """
-    return read_template("index.html")
-
-
-def render_series_page(
-    summary: dict[str, Any],
-    observations: list[dict[str, Any]],
-) -> str:
-    rows_html = "".join(
-        "<tr>"
-        f"<td>{escape(str(row.get('time_period', '')))}</td>"
-        f"<td>{escape(str(row.get('obs_value', '')))}</td>"
-        "</tr>"
-        for row in observations
-    )
-
-    if not rows_html:
-        rows_html = '<tr><td colspan="2">No observations found.</td></tr>'
-
-    template = read_template("series.html")
-
-    replacements = {
-        "{{ dataset_id }}": escape(str(summary.get("dataset_id", ""))),
-        "{{ dataset_title }}": escape(str(summary.get("dataset_title", "") or "")),
-        "{{ indicator_code }}": escape(str(summary.get("indicator_code", ""))),
-        "{{ indicator_name }}": escape(str(summary.get("indicator_name", ""))),
-        "{{ frequency_name }}": escape(str(summary.get("frequency_name", "") or "")),
-        "{{ first_period }}": escape(str(summary.get("first_period", "") or "")),
-        "{{ latest_period }}": escape(str(summary.get("latest_period", "") or "")),
-        "{{ observation_count }}": escape(
-            str(summary.get("observation_count", "") or "")
-        ),
-        "{{ metadata_url }}": escape(
-            f"/v1/datasets/{summary.get('dataset_id', '')}"
-            f"/series/by-indicator/{summary.get('indicator_code', '')}",
-            quote=True,
-        ),
-        "{{ observations_url }}": escape(
-            f"/v1/datasets/{summary.get('dataset_id', '')}"
-            f"/series/by-indicator/{summary.get('indicator_code', '')}"
-            "/observations?limit=20",
-            quote=True,
-        ),
-        "{{ observations_rows }}": rows_html,
-    }
-
-    for placeholder, value in replacements.items():
-        template = template.replace(placeholder, value)
-
-    return template
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/series/{dataset_id}/{indicator_code}", response_class=HTMLResponse)
 def series_page(
+    request: Request,
     dataset_id: str = Path(
         ...,
         description="Dataset ID, for example NAG_GBR.",
@@ -104,7 +55,7 @@ def series_page(
         ...,
         description="SDMX indicator code, for example NGDP_R_SA_XDC.",
     ),
-) -> str:
+) -> HTMLResponse:
     """
     Friendly browser page for one series.
     """
@@ -125,7 +76,24 @@ def series_page(
         20,
     )
 
-    return render_series_page(summary, observations)
+    encoded_dataset_id = quote(dataset_id, safe="")
+    encoded_indicator_code = quote(indicator_code, safe="")
+    metadata_url = (
+        f"/v1/datasets/{encoded_dataset_id}"
+        f"/series/by-indicator/{encoded_indicator_code}"
+    )
+    observations_url = f"{metadata_url}/observations?limit=20"
+
+    return templates.TemplateResponse(
+        "series.html",
+        {
+            "request": request,
+            "summary": summary,
+            "observations": observations,
+            "metadata_url": metadata_url,
+            "observations_url": observations_url,
+        },
+    )
 
 
 @app.get("/health")

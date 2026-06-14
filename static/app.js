@@ -103,7 +103,11 @@ async function runSearch(query) {
 
   resultsDiv.innerHTML = `
     <h2>Results for "${data.query}" in ${datasetLabel}</h2>
-    ${data.results.map(result => `
+    ${data.results.map(result => {
+      const datasetId = encodeURIComponent(result.dataset_id);
+      const indicatorCode = encodeURIComponent(result.indicator_code);
+
+      return `
       <div class="result">
         <h3>${result.indicator_name}</h3>
 
@@ -132,15 +136,15 @@ async function runSearch(query) {
         </p>
 
         <p>
-          <a href="/series/${result.dataset_id}/${result.indicator_code}">
+          <a href="/series/${datasetId}/${indicatorCode}">
             View series page
           </a>
           |
-          <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}" target="_blank">
+          <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}" target="_blank">
             View metadata JSON
           </a>
           |
-          <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}/observations?limit=5" target="_blank">
+          <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}/observations?limit=5" target="_blank">
             View first 5 observations JSON
           </a>
           ${externalLink(result.source_url, "Official SDMX source")}
@@ -148,7 +152,8 @@ async function runSearch(query) {
           ${externalLink(result.metadata_url, "IMF metadata")}
         </p>
       </div>
-    `).join("")}
+    `;
+    }).join("")}
   `;
 }
 
