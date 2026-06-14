@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path as FilePath
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from scripts.query_postgres import (
     build_observations_by_indicator_response,
@@ -15,273 +17,22 @@ from scripts.query_postgres import (
 )
 
 
+BASE_DIR = FilePath(__file__).resolve().parents[2]
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
+
 app = FastAPI(
     title="ONS StatsChat Lite API",
     description="A lightweight API for discovering public ONS/IMF SDMX series.",
     version="0.1.0",
 )
 
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-HOME_PAGE_HTML = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>ONS StatsChat Lite</title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 20px;
-      line-height: 1.5;
-    }
 
-    input,
-    select {
-      width: 70%;
-      padding: 10px;
-      font-size: 1rem;
-    }
-
-    button {
-      padding: 10px 14px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    .dataset-summary {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 14px;
-      margin: 18px 0;
-      background: #fafafa;
-    }
-
-    .result {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 14px;
-      margin: 14px 0;
-    }
-
-    .code {
-      font-family: monospace;
-      background: #f5f5f5;
-      padding: 2px 5px;
-      border-radius: 4px;
-    }
-
-    .muted {
-      color: #666;
-    }
-  </style>
-</head>
-<body>
-  <h1>ONS StatsChat Lite</h1>
-
-  <p>
-    Search public ONS/IMF SDMX series metadata.
-  </p>
-
-  <div id="dataset-summary" class="dataset-summary">
-    Loading available datasets...
-  </div>
-
-  <form id="search-form">
-    <p>
-      <label for="dataset-select">Dataset</label><br>
-      <select id="dataset-select">
-        <option value="">All datasets</option>
-      </select>
-    </p>
-
-    <p>
-      <label for="search-input">Search terms</label><br>
-      <input
-        id="search-input"
-        type="search"
-        value="real gdp"
-        placeholder="Try: real gdp, consumer price, retail price, imports"
-      >
-      <button type="submit">Search</button>
-    </p>
-  </form>
-
-  <p class="muted">
-    This page calls the local FastAPI endpoint:
-    <span class="code">/v1/series/search</span>
-  </p>
-
-  <div id="results"></div>
-
-  <script>
-    const form = document.getElementById("search-form");
-    const input = document.getElementById("search-input");
-    const datasetSelect = document.getElementById("dataset-select");
-    const resultsDiv = document.getElementById("results");
-    const datasetSummaryDiv = document.getElementById("dataset-summary");
-
-    function externalLink(url, label) {
-      if (!url) {
-        return "";
-      }
-
-      return `
-        |
-        <a href="${url}" target="_blank" rel="noopener noreferrer">
-          ${label}
-        </a>
-      `;
-    }
-
-    async function loadDatasetSummary() {
-      const response = await fetch("/v1/datasets");
-
-      if (!response.ok) {
-        datasetSummaryDiv.innerHTML = "<p>Could not load dataset summary.</p>";
-        return;
-      }
-
-      const data = await response.json();
-
-      datasetSelect.innerHTML = `
-        <option value="">All datasets</option>
-        ${data.datasets.map(dataset => `
-          <option value="${dataset.dataset_id}">
-            ${dataset.dataset_id} — ${dataset.dataset_title}
-          </option>
-        `).join("")}
-      `;
-
-      if (data.datasets.length === 0) {
-        datasetSummaryDiv.innerHTML = "<p>No datasets are currently loaded.</p>";
-        return;
-      }
-
-      datasetSummaryDiv.innerHTML = `
-        <h2>Available datasets</h2>
-        ${data.datasets.map(dataset => `
-          <p>
-            <strong>${dataset.dataset_id}</strong>
-            ${dataset.dataset_title ? `— ${dataset.dataset_title}` : ""}
-          </p>
-
-          <p>
-            Series: ${dataset.series_count}
-            |
-            Observations: ${dataset.observation_count}
-            |
-            Structure:
-            <span class="code">${dataset.structure_ref}</span>
-          </p>
-
-          <p>
-            <a href="${dataset.source_url}" target="_blank" rel="noopener noreferrer">
-              Official SDMX source
-            </a>
-            ${externalLink(dataset.documentation_url, "ONS documentation")}
-            ${externalLink(dataset.metadata_url, "IMF metadata")}
-          </p>
-        `).join("")}
-      `;
-    }
-
-    async function runSearch(query) {
-      resultsDiv.innerHTML = "<p>Searching...</p>";
-
-      const selectedDatasetId = datasetSelect.value;
-
-      let url = `/v1/series/search?q=${encodeURIComponent(query)}&limit=5`;
-
-      if (selectedDatasetId) {
-        url += `&dataset_id=${encodeURIComponent(selectedDatasetId)}`;
-      }
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        resultsDiv.innerHTML = `<p>Search failed: ${response.status}</p>`;
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.results.length === 0) {
-        const datasetLabel = selectedDatasetId || "all datasets";
-
-        resultsDiv.innerHTML = `
-          <h2>Results for "${data.query}" in ${datasetLabel}</h2>
-          <p>No results found.</p>
-        `;
-        return;
-      }
-
-      const datasetLabel = selectedDatasetId || "all datasets";
-
-      resultsDiv.innerHTML = `
-        <h2>Results for "${data.query}" in ${datasetLabel}</h2>
-        ${data.results.map(result => `
-          <div class="result">
-            <h3>${result.indicator_name}</h3>
-
-            <p>
-              Indicator:
-              <span class="code">${result.indicator_code}</span>
-            </p>
-
-            <p>
-              Dataset:
-              <span class="code">${result.dataset_id}</span>
-              ${result.dataset_title ? `— ${result.dataset_title}` : ""}
-            </p>
-
-            <p>
-              Structure:
-              <span class="code">${result.structure_ref}</span>
-            </p>
-
-            <p>
-              Frequency: ${result.frequency_name}
-              |
-              Period: ${result.first_period} to ${result.latest_period}
-              |
-              Observations: ${result.observation_count}
-            </p>
-
-            <p>
-              <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}" target="_blank">
-                View metadata JSON
-              </a>
-              |
-              <a href="/v1/datasets/${result.dataset_id}/series/by-indicator/${result.indicator_code}/observations?limit=5" target="_blank">
-                View first 5 observations JSON
-              </a>
-              ${externalLink(result.source_url, "Official SDMX source")}
-              ${externalLink(result.documentation_url, "ONS documentation")}
-              ${externalLink(result.metadata_url, "IMF metadata")}
-            </p>
-          </div>
-        `).join("")}
-      `;
-    }
-
-    form.addEventListener("submit", event => {
-      event.preventDefault();
-      runSearch(input.value);
-    });
-
-    datasetSelect.addEventListener("change", () => {
-      runSearch(input.value);
-    });
-
-    loadDatasetSummary().then(() => {
-      runSearch(input.value);
-    });
-  </script>
-</body>
-</html>
-"""
+def read_template(template_name: str) -> str:
+    return (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -291,7 +42,15 @@ def home_page() -> str:
 
     This is intentionally simple: one HTML page calling our JSON API.
     """
-    return HOME_PAGE_HTML
+    return read_template("index.html")
+
+
+@app.get("/series", response_class=HTMLResponse)
+def series_page() -> str:
+    """
+    Tiny browser page for series API links.
+    """
+    return read_template("series.html")
 
 
 @app.get("/health")
