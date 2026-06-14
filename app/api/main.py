@@ -41,7 +41,11 @@ def home_page(request: Request) -> HTMLResponse:
 
     This is intentionally simple: one HTML page calling our JSON API.
     """
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={},
+    )
 
 
 @app.get("/series/{dataset_id}/{indicator_code}", response_class=HTMLResponse)
@@ -85,9 +89,9 @@ def series_page(
     observations_url = f"{metadata_url}/observations?limit=20"
 
     return templates.TemplateResponse(
-        "series.html",
-        {
-            "request": request,
+        request=request,
+        name="series.html",
+        context={
             "summary": summary,
             "observations": observations,
             "metadata_url": metadata_url,
