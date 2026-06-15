@@ -1,6 +1,12 @@
-# StatsChat Lite
+# StatsFinder
 
-**StatsChat Lite** is an experimental lightweight application for discovering, inspecting, and retrieving official statistical series.
+## Public repo note
+
+This is an independent experimental prototype. It is not an official ONS product.
+
+The project uses public official data sources where available and aims to preserve clear source attribution and provenance throughout the application.
+
+**StatsFinder** is an experimental lightweight application for discovering, inspecting, and retrieving official statistical series.
 
 The project explores a simple idea:
 
@@ -271,9 +277,4 @@ should eventually map to candidate official series using metadata, codelists, al
 
 The semantic layer should not generate observations. It should retrieve and explain official metadata matches.
 
-## Public repo note
-
-This is an independent experimental prototype. It is not an official ONS product.
-
-The project uses public official data sources where available and aims to preserve clear source attribution and provenance throughout the application.
 
