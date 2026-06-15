@@ -15,6 +15,15 @@ DB_DSN = os.environ.get(
 )
 
 
+def get_dsn() -> str:
+    dsn = os.environ.get("ONS_SDMX_DB_DSN")
+
+    if not dsn:
+        raise RuntimeError("ONS_SDMX_DB_DSN is not set")
+
+    return dsn
+
+
 def get_connection() -> psycopg.Connection:
     """
     Open a connection to the Postgres database.
@@ -23,6 +32,24 @@ def get_connection() -> psycopg.Connection:
     so we can use row["series_id"] instead of row[0].
     """
     return psycopg.connect(DB_DSN, row_factory=dict_row)
+
+
+def get_database_health() -> dict[str, int]:
+    queries = {
+        "datasets": "SELECT COUNT(*) FROM datasets",
+        "series": "SELECT COUNT(*) FROM series",
+        "observations": "SELECT COUNT(*) FROM observations",
+    }
+
+    counts: dict[str, int] = {}
+
+    with psycopg.connect(get_dsn()) as conn:
+        with conn.cursor() as cur:
+            for label, query in queries.items():
+                cur.execute(query)
+                counts[label] = cur.fetchone()[0]
+
+    return counts
 
 
 def split_query_terms(query: str) -> list[str]:

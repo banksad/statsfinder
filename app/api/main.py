@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from scripts.query_postgres import (
     build_observations_by_indicator_response,
     build_search_response,
+    get_database_health,
     get_series_observations_by_indicator,
     get_series_summary_by_indicator,
     list_datasets,
@@ -266,6 +267,34 @@ def health_check() -> dict[str, str]:
     This proves the API server is running.
     """
     return {"status": "ok"}
+
+
+
+@app.get("/health/db")
+def database_health_check() -> dict[str, Any]:
+    """
+    Database-aware health check.
+
+    This proves the API can reach Postgres and query the core tables.
+    """
+    try:
+        counts = get_database_health()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "error",
+                "database": "unreachable",
+                "error": str(exc),
+            },
+        ) from exc
+
+    return {
+        "status": "ok",
+        "database": "reachable",
+        **counts,
+    }
+
 
 
 @app.get("/v1/datasets")
