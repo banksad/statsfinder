@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Path, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -26,8 +26,11 @@ STATIC_DIR = BASE_DIR / "static"
 
 
 app = FastAPI(
-    title="ONS StatsChat Lite API",
-    description="A lightweight API for discovering public ONS/IMF SDMX series.",
+    title="Stats Finder API",
+    description=(
+        "A lightweight API for discovering official statistical series "
+        "grounded in published SDMX data."
+    ),
     version="0.1.0",
 )
 
@@ -184,17 +187,58 @@ def build_line_chart_data(
     }
 
 
-@app.get("/", response_class=HTMLResponse)
-def home_page(request: Request) -> HTMLResponse:
+@app.get("/")
+def home() -> RedirectResponse:
     """
-    Tiny browser UI for searching series metadata.
+    Redirect the product root to the canonical Search page.
+    """
+    return RedirectResponse(url="/search", status_code=307)
 
-    This is intentionally simple: one HTML page calling our JSON API.
+
+@app.get("/search", response_class=HTMLResponse)
+def search_page(request: Request) -> HTMLResponse:
     """
+    Browser UI for searching series metadata.
+    """
+    datasets = list_datasets()
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={},
+        context={
+            "datasets": datasets,
+            "active_nav": "search",
+        },
+    )
+
+
+@app.get("/browse", response_class=HTMLResponse)
+def browse_page(request: Request) -> HTMLResponse:
+    """
+    Placeholder Browse page.
+
+    This will become the structured discovery tree.
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="browse.html",
+        context={
+            "active_nav": "browse",
+        },
+    )
+
+
+@app.get("/api", response_class=HTMLResponse)
+def api_page(request: Request) -> HTMLResponse:
+    """
+    Human-friendly API landing page.
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="api.html",
+        context={
+            "active_nav": "api",
+        },
     )
 
 
@@ -255,6 +299,7 @@ def series_page(
             "chart": chart,
             "metadata_url": metadata_url,
             "observations_url": observations_url,
+            "active_nav": "search",
         },
     )
 
@@ -267,7 +312,6 @@ def health_check() -> dict[str, str]:
     This proves the API server is running.
     """
     return {"status": "ok"}
-
 
 
 @app.get("/health/db")
@@ -294,7 +338,6 @@ def database_health_check() -> dict[str, Any]:
         "database": "reachable",
         **counts,
     }
-
 
 
 @app.get("/v1/datasets")

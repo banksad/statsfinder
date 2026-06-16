@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{{ summary.indicator_name }} — ONS StatsChat Lite</title>
+  <title>{{ summary.indicator_name }} — StatsFinder</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+
+  {% set active_nav = active_nav | default("search") %}
+  {% include "_nav.html" %}
+
   <p><a href="/">← Back to search</a></p>
 
   <h1>{{ summary.indicator_name }}</h1>

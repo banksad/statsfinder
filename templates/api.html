@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>API — StatsFinder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  {% set active_nav = "api" %}
+  {% include "_nav.html" %}
+
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Developer access</p>
+      <h1>Use the StatsFinder API</h1>
+      <p>
+        The API provides source-backed access to datasets, series metadata,
+        observations, search results, and future exports.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Useful endpoints</h2>
+
+      <ul>
+        <li><a href="/health">/health</a></li>
+        <li><a href="/health/db">/health/db</a></li>
+        <li><a href="/v1/datasets">/v1/datasets</a></li>
+        <li><a href="/v1/series/search?q=inflation">/v1/series/search?q=inflation</a></li>
+        <li><a href="/docs">Interactive API docs</a></li>
+        <li><a href="/openapi.json">OpenAPI JSON</a></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

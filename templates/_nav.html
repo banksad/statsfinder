@@ -1,0 +1,9 @@
+<header class="site-header">
+  <a class="site-brand" href="/search">Stats Finder</a>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/search" class="{% if active_nav == 'search' %}active{% endif %}">Search</a>
+    <a href="/browse" class="{% if active_nav == 'browse' %}active{% endif %}">Browse</a>
+    <a href="/api" class="{% if active_nav == 'api' %}active{% endif %}">API</a>
+  </nav>
+</header>

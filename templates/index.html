@@ -2,12 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>ONS StatsChat Lite</title>
+  <title>StatsFinder</title>
   <link rel="stylesheet" href="/static/styles.css">
 
 </head>
 <body>
-  <h1>ONS StatsChat Lite</h1>
+  
+  {% set active_nav = active_nav | default("search") %}
+  {% include "_nav.html" %}
+
+  <h1>StatsFinder</h1>
 
   <p>
     Search public ONS/IMF SDMX series metadata.
