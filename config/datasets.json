@@ -40,5 +40,19 @@
   "series_raw_json_path": "data/processed/bop_series_records.json",
   "series_json_path": "data/processed/bop_series_enriched.json",
   "observations_json_path": "data/processed/bop_observation_records.json"
+  },
+  {
+  "dataset_id": "SBS_GBR",
+  "title": "UK Sectoral Balance Sheet",
+  "data_domain_code": "SBS",
+  "data_domain_label": "Accumulation Accounts (Sectoral Balance Sheets)",
+  "source_url": "https://static.ons.gov.uk/imf/SBS_GBR.xml",
+  "documentation_url": "https://www.ons.gov.uk/aboutus/imfpage",
+  "metadata_url": null,
+  "structure_ref": "IMF_ECOFIN_DSD_1_0",
+  "raw_file_path": "data/raw/SBS_GBR.xml",
+  "series_raw_json_path": "data/processed/sbs_series_records.json",
+  "series_json_path": "data/processed/sbs_series_enriched.json",
+  "observations_json_path": "data/processed/sbs_observation_records.json"
   }
 ]
