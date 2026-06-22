@@ -166,17 +166,26 @@ def list_series_for_dataset(
     """
     Return series belonging to one dataset.
 
-    The series table stores SDMX-derived metadata in JSONB fields. We extract
-    useful public-facing fields here so HTML templates and API endpoints can
-    share the same source-backed representation.
+    This powers both:
+    - /v1/datasets/{dataset_id}/series
+    - /browse/datasets/{dataset_id}
 
-    limit and offset make this safe to expose through the public API without
-    returning every series by default.
+    Where available, it uses the cleaned semantic-search document metadata
+    to provide a friendlier display name and parsed fields.
     """
     sql = """
+        WITH observation_summary AS (
+            SELECT
+                series_id,
+                MIN(time_period) AS first_period,
+                MAX(time_period) AS latest_period,
+                COUNT(observation_id) AS observation_count
+            FROM observations
+            GROUP BY series_id
+        )
         SELECT
             s.series_id,
-            s.dataset_id,
+            d.dataset_id,
             d.title AS dataset_title,
             d.source_url,
             d.documentation_url,
@@ -185,38 +194,34 @@ def list_series_for_dataset(
             s.series_key,
             s.dimension_values ->> 'INDICATOR' AS indicator_code,
             s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
+            COALESCE(
+                sd.primary_text,
+                s.dimension_labels -> 'INDICATOR' ->> 'name',
+                s.dimension_values ->> 'INDICATOR'
+            ) AS display_name,
+            sd.parsed_metadata ->> 'measure_type' AS measure_type,
+            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
+            sd.parsed_metadata ->> 'unit' AS unit,
+            sd.parsed_metadata ->> 'base_period' AS base_period,
+            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
             s.dimension_values ->> 'FREQ' AS frequency_code,
             s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            MIN(o.time_period) AS first_period,
-            MAX(o.time_period) AS latest_period,
-            COUNT(o.observation_id) AS observation_count
+            observation_summary.first_period,
+            observation_summary.latest_period,
+            COALESCE(observation_summary.observation_count, 0) AS observation_count
         FROM series s
         JOIN datasets d
             ON d.dataset_id = s.dataset_id
-        LEFT JOIN observations o
-            ON o.series_id = s.series_id
+        LEFT JOIN series_search_documents sd
+            ON sd.series_id = s.series_id
+        LEFT JOIN observation_summary
+            ON observation_summary.series_id = s.series_id
         WHERE s.dataset_id = %s
-        GROUP BY
-            s.series_id,
-            s.dataset_id,
-            d.title,
-            d.source_url,
-            d.documentation_url,
-            d.metadata_url,
-            d.structure_ref,
-            s.series_key,
-            s.dimension_values ->> 'INDICATOR',
-            s.dimension_labels -> 'INDICATOR' ->> 'name',
-            s.dimension_values ->> 'FREQ',
-            s.dimension_labels -> 'FREQ' ->> 'name'
         ORDER BY
-            LOWER(
-                COALESCE(
-                    s.dimension_labels -> 'INDICATOR' ->> 'name',
-                    s.dimension_values ->> 'INDICATOR',
-                    s.series_key
-                )
-            )
+            display_name,
+            measure_type NULLS LAST,
+            seasonal_adjustment NULLS LAST,
+            indicator_code
         LIMIT %s
         OFFSET %s;
     """
