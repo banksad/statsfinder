@@ -118,6 +118,61 @@ def search_series_by_embedding(
                 d.indicator_code,
                 d.indicator_name,
                 d.primary_text,
+                COALESCE(
+                    CASE
+                        WHEN d.dataset_id = 'BOP_GBR' THEN (
+                            SELECT string_agg(cleaned_part, ', ' ORDER BY ord)
+                            FROM (
+                                SELECT
+                                    h.ord,
+                                    NULLIF(
+                                        trim(
+                                            regexp_replace(
+                                                h.value,
+                                                '\\s*\\[BPM6\\]',
+                                                '',
+                                                'g'
+                                            )
+                                        ),
+                                        ''
+                                    ) AS cleaned_part
+                                FROM jsonb_array_elements_text(
+                                    d.parsed_metadata -> 'hierarchy'
+                                ) WITH ORDINALITY AS h(value, ord)
+                                WHERE h.ord > 1
+                                  AND h.value <> 'Current Account'
+                            ) parts
+                            WHERE cleaned_part IS NOT NULL
+                        )
+
+                        WHEN d.dataset_id = 'SBS_GBR' THEN (
+                            SELECT string_agg(h.value, ', ' ORDER BY h.ord)
+                            FROM jsonb_array_elements_text(
+                                d.parsed_metadata -> 'hierarchy'
+                            ) WITH ORDINALITY AS h(value, ord)
+                            WHERE h.ord > 2
+                        )
+
+                        WHEN d.dataset_id = 'CPI_GBR' THEN (
+                            SELECT string_agg(h.value, ', ' ORDER BY h.ord)
+                            FROM jsonb_array_elements_text(
+                                d.parsed_metadata -> 'hierarchy'
+                            ) WITH ORDINALITY AS h(value, ord)
+                            WHERE h.ord > 1
+                        )
+
+                        ELSE
+                            d.primary_text
+                    END,
+                    d.primary_text,
+                    d.indicator_name,
+                    d.indicator_code
+                ) AS display_name,
+                d.parsed_metadata ->> 'measure_type' AS measure_type,
+                d.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
+                d.parsed_metadata ->> 'unit' AS unit,
+                d.parsed_metadata ->> 'base_period' AS base_period,
+                d.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
                 d.embedding_text,
                 d.keyword_text,
                 s.dimension_values ->> 'FREQ' AS frequency_code,
@@ -144,6 +199,12 @@ def search_series_by_embedding(
             ranked.indicator_code,
             ranked.indicator_name,
             ranked.primary_text,
+            ranked.display_name,
+            ranked.measure_type,
+            ranked.seasonal_adjustment,
+            ranked.unit,
+            ranked.base_period,
+            ranked.unit_multiplier,
             ranked.embedding_text,
             ranked.keyword_text,
             ranked.frequency_code,
@@ -169,6 +230,12 @@ def search_series_by_embedding(
             ranked.indicator_code,
             ranked.indicator_name,
             ranked.primary_text,
+            ranked.display_name,
+            ranked.measure_type,
+            ranked.seasonal_adjustment,
+            ranked.unit,
+            ranked.base_period,
+            ranked.unit_multiplier,
             ranked.embedding_text,
             ranked.keyword_text,
             ranked.frequency_code,

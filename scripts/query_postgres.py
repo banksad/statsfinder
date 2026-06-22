@@ -195,6 +195,48 @@ def list_series_for_dataset(
             s.dimension_values ->> 'INDICATOR' AS indicator_code,
             s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
             COALESCE(
+                CASE
+                    WHEN s.dataset_id = 'BOP_GBR' THEN (
+                        SELECT string_agg(cleaned_part, ', ' ORDER BY ord)
+                        FROM (
+                            SELECT
+                                h.ord,
+                                NULLIF(
+                                    trim(
+                                        regexp_replace(
+                                            h.value,
+                                            '\\s*\\[BPM6\\]',
+                                            '',
+                                            'g'
+                                        )
+                                    ),
+                                    ''
+                                ) AS cleaned_part
+                            FROM jsonb_array_elements_text(sd.parsed_metadata -> 'hierarchy')
+                                WITH ORDINALITY AS h(value, ord)
+                            WHERE h.ord > 1
+                              AND h.value <> 'Current Account'
+                        ) parts
+                        WHERE cleaned_part IS NOT NULL
+                    )
+
+                    WHEN s.dataset_id = 'SBS_GBR' THEN (
+                        SELECT string_agg(h.value, ', ' ORDER BY h.ord)
+                        FROM jsonb_array_elements_text(sd.parsed_metadata -> 'hierarchy')
+                            WITH ORDINALITY AS h(value, ord)
+                        WHERE h.ord > 2
+                    )
+
+                    WHEN s.dataset_id = 'CPI_GBR' THEN (
+                        SELECT string_agg(h.value, ', ' ORDER BY h.ord)
+                        FROM jsonb_array_elements_text(sd.parsed_metadata -> 'hierarchy')
+                            WITH ORDINALITY AS h(value, ord)
+                        WHERE h.ord > 1
+                    )
+
+                    ELSE
+                        sd.primary_text
+                END,
                 sd.primary_text,
                 s.dimension_labels -> 'INDICATOR' ->> 'name',
                 s.dimension_values ->> 'INDICATOR'

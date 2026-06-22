@@ -61,26 +61,103 @@
       </dl>
     </section>
 
-    <section class="dataset-actions">
-      <form class="dataset-search-form" action="/search" method="get">
-        <input type="hidden" name="mode" value="semantic">
-        <input type="hidden" name="dataset_id" value="{{ dataset.dataset_id }}">
+	<section class="dataset-actions">
+	  <form class="dataset-search-form" action="/browse/datasets/{{ dataset.dataset_id }}" method="get">
+	    <label for="dataset-search-query">
+	      Search within this dataset
+	    </label>
 
-        <label for="dataset-search-query">
-          Search within this dataset
-        </label>
+	    <div class="inline-form-row">
+	      <input
+		id="dataset-search-query"
+		name="q"
+		type="search"
+		value="{{ search_query or '' }}"
+		placeholder="Try exports, real GDP, household spending..."
+	      >
+	      <button type="submit">Search</button>
+	    </div>
+	  </form>
+	</section>
 
-        <div class="inline-form-row">
-          <input
-            id="dataset-search-query"
-            name="q"
-            type="search"
-            placeholder="Try exports, real GDP, household spending..."
-          >
-          <button type="submit">Search</button>
-        </div>
-      </form>
-    </section>
+	{% if search_query %}
+	<section class="card">
+	  <h2>Top matches for "{{ search_query }}"</h2>
+
+	  {% if search_error %}
+	    <p class="muted">
+	      Semantic search is not available: {{ search_error }}
+	    </p>
+	  {% elif search_results %}
+	    <p class="muted">
+	      Showing the top {{ search_results|length }} semantic matches in this dataset.
+	    </p>
+
+	    <div class="table-scroll">
+	      <table class="series-table">
+		<thead>
+		  <tr>
+		    <th>Series</th>
+		    <th>Type</th>
+		    <th>Adjustment</th>
+		    <th>Period</th>
+		    <th>Score</th>
+		    <th>Open</th>
+		  </tr>
+		</thead>
+
+		<tbody>
+		  {% for item in search_results %}
+		  <tr>
+		    <td class="series-title-cell">
+		      <a
+			class="series-main-name"
+			href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}"
+		      >
+			{{ item.display_name or item.primary_text or item.indicator_name or item.indicator_code }}
+		      </a>
+
+		      {% if item.indicator_name %}
+			<div class="series-official-name">
+			  Official label: {{ item.indicator_name }}
+			</div>
+		      {% endif %}
+
+		      <div class="series-code">
+			Code: <span class="code">{{ item.indicator_code }}</span>
+		      </div>
+		    </td>
+
+		    <td>{{ item.measure_type or "—" }}</td>
+		    <td>{{ item.seasonal_adjustment or "—" }}</td>
+
+		    <td>
+		      {% if item.first_period and item.latest_period %}
+			{{ item.first_period }} to {{ item.latest_period }}
+		      {% else %}
+			—
+		      {% endif %}
+		    </td>
+
+		    <td class="numeric">
+		      {{ "%.3f"|format(item.similarity_score) }}
+		    </td>
+
+		    <td>
+		      <a href="/series/{{ item.dataset_id }}/{{ item.indicator_code }}">
+			View
+		      </a>
+		    </td>
+		  </tr>
+		  {% endfor %}
+		</tbody>
+	      </table>
+	    </div>
+	  {% else %}
+	    <p>No semantic matches found in this dataset.</p>
+	  {% endif %}
+	</section>
+	{% endif %}
 
     <section class="card">
       <h2>Source and provenance</h2>

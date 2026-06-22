@@ -311,12 +311,18 @@ def browse_dataset_page(
         ...,
         description="Dataset ID, for example NAG_GBR.",
     ),
+    q: str | None = Query(
+        None,
+        description="Optional semantic search query within this dataset.",
+    ),
 ) -> HTMLResponse:
     """
     Lightweight dataset Browse page.
 
-    Browse v1 is deliberately simple:
-    curated topic page -> source-backed dataset page -> existing series pages.
+    Browse page:
+    - shows source-backed dataset metadata
+    - shows a full series table
+    - optionally shows top semantic matches within the dataset
     """
     dataset = get_dataset(dataset_id)
 
@@ -328,6 +334,24 @@ def browse_dataset_page(
 
     series = list_series_for_dataset(dataset_id, limit=500)
 
+    search_query = q.strip() if q else ""
+    search_results: list[dict[str, Any]] = []
+    search_error: str | None = None
+
+    if search_query:
+        try:
+            search_results = semantic_search_series(
+                query=search_query,
+                model=DEFAULT_SEMANTIC_MODEL,
+                embedding_dim=DEFAULT_SEMANTIC_DIMENSION,
+                limit=5,
+                dataset_id=dataset_id,
+                min_similarity=0.0,
+                include_debug=False,
+            )
+        except RuntimeError as exc:
+            search_error = str(exc)
+
     return templates.TemplateResponse(
         request=request,
         name="browse_dataset.html",
@@ -335,10 +359,12 @@ def browse_dataset_page(
             "dataset": dataset,
             "series": series,
             "series_count": len(series),
+            "search_query": search_query,
+            "search_results": search_results,
+            "search_error": search_error,
             "active_nav": "browse",
         },
     )
-
 
 @app.get("/api", response_class=HTMLResponse)
 def api_page(request: Request) -> HTMLResponse:
