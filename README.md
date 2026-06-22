@@ -176,6 +176,12 @@ python3 -m scripts.bootstrap_local_db
 
 This applies the schema, loads configured datasets, and prints row counts.
 
+With the local Docker stack running, run local smoke tests with:
+
+```bash
+docker compose --env-file .env -f infra/local/compose.yaml up -d --build
+python -m scripts.smoke_test_local
+
 ### 4. Open the app
 
 ```text

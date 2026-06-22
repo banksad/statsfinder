@@ -124,6 +124,7 @@
               <th>Frequency</th>
               <th>Period</th>
               <th>Observations</th>
+	      <th>Download</th>
             </tr>
           </thead>
           <tbody>
@@ -162,6 +163,15 @@
               <td class="numeric">
                 {{ item.observation_count }}
               </td>
+		<td>
+		  {% if item.indicator_code %}
+		    <a href="/v1/datasets/{{ item.dataset_id }}/series/by-indicator/{{ item.indicator_code }}/observations.csv?limit=10000">
+		      CSV
+		    </a>
+		  {% else %}
+		    —
+		  {% endif %}
+		</td>
             </tr>
             {% endfor %}
           </tbody>
