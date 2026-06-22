@@ -180,6 +180,9 @@ async function runSearch(query, options = {}) {
       const datasetId = encodeURIComponent(result.dataset_id);
       const indicatorCode = encodeURIComponent(result.indicator_code);
 
+      const metadataUrl = `/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}`;
+      const csvUrl = `${metadataUrl}/observations.csv?limit=10000`;
+
       return `
         <div class="result">
           <h3>${escapeHtml(result.indicator_name || result.indicator_code)}</h3>
@@ -224,6 +227,10 @@ async function runSearch(query, options = {}) {
             <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}/observations?limit=5" target="_blank" rel="noopener noreferrer">
               View first 5 observations JSON
             </a>
+            |
+	    <a href="${csvUrl}">
+	      Download CSV
+	    </a>
             ${externalLink(result.source_url, "Official SDMX source")}
             ${externalLink(result.documentation_url, "ONS documentation")}
             ${externalLink(result.metadata_url, "IMF metadata")}
