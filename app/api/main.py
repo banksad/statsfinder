@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import csv
+import io
+import re
+
 from pathlib import Path as FilePath
 from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Path, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -38,6 +42,71 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+def safe_filename_component(value: str) -> str:
+    """
+    Convert a public identifier into a safe filename component.
+
+    Dataset IDs and indicator codes are already controlled-looking strings,
+    but this keeps the Content-Disposition filename robust.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "-", value)
+    cleaned = cleaned.strip("-")
+
+    return cleaned or "series"
+
+
+def build_observations_csv(
+    summary: dict[str, Any],
+    observations: list[dict[str, Any]],
+) -> str:
+    """
+    Build a simple long-format CSV for one statistical series.
+
+    The CSV repeats series metadata on each row. That makes the file easy to
+    combine with other exported series later.
+    """
+    output = io.StringIO()
+
+    fieldnames = [
+        "dataset_id",
+        "dataset_title",
+        "series_key",
+        "indicator_code",
+        "indicator_name",
+        "frequency_code",
+        "frequency_name",
+        "time_period",
+        "obs_value",
+        "source_url",
+        "documentation_url",
+        "metadata_url",
+        "structure_ref",
+    ]
+
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for observation in observations:
+        writer.writerow(
+            {
+                "dataset_id": summary.get("dataset_id"),
+                "dataset_title": summary.get("dataset_title"),
+                "series_key": summary.get("series_key"),
+                "indicator_code": summary.get("indicator_code"),
+                "indicator_name": summary.get("indicator_name"),
+                "frequency_code": summary.get("frequency_code"),
+                "frequency_name": summary.get("frequency_name"),
+                "time_period": observation.get("time_period"),
+                "obs_value": observation.get("obs_value"),
+                "source_url": summary.get("source_url"),
+                "documentation_url": summary.get("documentation_url"),
+                "metadata_url": summary.get("metadata_url"),
+                "structure_ref": summary.get("structure_ref"),
+            }
+        )
+
+    return output.getvalue()
 
 
 def format_chart_value(value: float) -> str:
@@ -326,6 +395,7 @@ def series_page(
         f"/series/by-indicator/{encoded_indicator_code}"
     )
     observations_url = f"{metadata_url}/observations?limit=20"
+    observations_csv_url = f"{metadata_url}/observations.csv?limit=10000"
 
     return templates.TemplateResponse(
         request=request,
@@ -336,6 +406,7 @@ def series_page(
             "chart": chart,
             "metadata_url": metadata_url,
             "observations_url": observations_url,
+            "observations_csv_url": observations_csv_url,
             "active_nav": "search",
         },
     )
@@ -576,4 +647,60 @@ def get_series_observations_by_indicator_endpoint(
         indicator_code,
         limit,
         rows,
+    )
+
+@app.get(
+    "/v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}/observations.csv"
+)
+def get_series_observations_by_indicator_csv_endpoint(
+    dataset_id: str = Path(
+        ...,
+        description="Dataset ID, for example NAG_GBR.",
+    ),
+    indicator_code: str = Path(
+        ...,
+        description="SDMX indicator code, for example NGDP_R_SA_XDC.",
+    ),
+    limit: int = Query(
+        10000,
+        ge=1,
+        le=100000,
+        description="Maximum number of observations to include in the CSV.",
+    ),
+) -> Response:
+    """
+    Return observations for one series as CSV.
+
+    This is a lightweight export endpoint. It keeps the same source-backed
+    identity model as the JSON observations endpoint.
+    """
+    summary = get_series_summary_by_indicator(dataset_id, indicator_code)
+
+    if summary is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Series not found for dataset_id={dataset_id} "
+                f"and indicator_code={indicator_code}."
+            ),
+        )
+
+    rows = get_series_observations_by_indicator(
+        dataset_id,
+        indicator_code,
+        limit,
+    )
+
+    csv_text = build_observations_csv(summary, rows)
+
+    safe_dataset_id = safe_filename_component(dataset_id)
+    safe_indicator_code = safe_filename_component(indicator_code)
+    filename = f"{safe_dataset_id}-{safe_indicator_code}-observations.csv"
+
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
     )
