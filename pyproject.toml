@@ -1,0 +1,24 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = [
+  "data/raw",
+  "data/structure",
+  "data/processed",
+  "pretty",
+]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "UP",  # pyupgrade
+]
+ignore = [
+  "E501", # keep line-length advisory through formatter rather than lint-only churn
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

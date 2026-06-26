@@ -181,8 +181,32 @@ With the local Docker stack running, run local smoke tests with:
 ```bash
 docker compose --env-file .env -f infra/local/compose.yaml up -d --build
 python -m scripts.smoke_test_local
+```
 
-### 4. Open the app
+### 4. Static formatting and lint checks
+
+The repository includes conservative Ruff configuration for Python formatting and
+static lint checks. To check formatting without changing files, run:
+
+```bash
+python -m ruff format --check .
+```
+
+To run lint checks, run:
+
+```bash
+python -m ruff check .
+```
+
+The browser code in `static/` is intentionally plain JavaScript and CSS with no
+Node or npm toolchain requirement. Keep JavaScript/CSS formatting small, manual,
+and reviewable unless the project explicitly introduces frontend tooling later.
+
+If a future formatting pass would touch many files, make that mechanical change
+in a separate follow-up commit so behavior-preserving refactors remain easy to
+review.
+
+### 5. Open the app
 
 ```text
 http://127.0.0.1:8000/
