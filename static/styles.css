@@ -548,6 +548,30 @@ th {
   font-size: 0.9rem;
 }
 
+.chart-container {
+  position: relative;
+}
+
+.chart-hit-target {
+  fill: transparent;
+  stroke: transparent;
+  cursor: crosshair;
+  pointer-events: all;
+}
+
+.chart-y-axis-title {
+  dominant-baseline: middle;
+}
+
+.chart-panel:fullscreen .chart-actions button {
+  width: fit-content;
+}
+
+.chart-panel:fullscreen .secondary-button {
+  background: var(--surface);
+}
+
+
 /* Chat */
 
 .chat-form {

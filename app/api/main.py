@@ -208,6 +208,42 @@ def format_chart_readout_value(value: float) -> str:
     return f"{value:,.3f}".rstrip("0").rstrip(".")
 
 
+def build_display_unit_label(summary: dict[str, Any]) -> str:
+    """
+    Build a human-friendly chart unit label.
+
+    Keep the raw SDMX unit in metadata, but make the chart label nicer.
+    For UK national currency series, show pounds and the unit multiplier.
+    """
+    raw_unit = (summary.get("unit") or "").strip()
+    unit_multiplier = str(summary.get("unit_multiplier") or "").strip()
+    dataset_id = str(summary.get("dataset_id") or "")
+
+    multiplier_labels = {
+        "0": "",
+        "3": "thousands",
+        "6": "millions",
+        "9": "billions",
+        "12": "trillions",
+    }
+
+    multiplier_label = multiplier_labels.get(unit_multiplier)
+
+    is_uk_series = dataset_id.endswith("_GBR")
+
+    if raw_unit.lower() == "national currency" and is_uk_series:
+        base_unit = "£"
+    elif raw_unit:
+        base_unit = raw_unit
+    else:
+        base_unit = "Value"
+
+    if multiplier_label:
+        return f"{base_unit} {multiplier_label}"
+
+    return base_unit
+
+
 def build_line_chart_data(
     observations: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -544,6 +580,7 @@ def series_page(
             "summary": summary,
             "observations": table_observations,
             "chart": chart,
+            "display_unit": build_display_unit_label(summary),
             "metadata_url": urls["metadata_url"],
             "observations_url": urls["observations_url"],
             "observations_csv_url": urls["observations_csv_url"],

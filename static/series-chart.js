@@ -6,25 +6,78 @@ const hoverPoint = document.getElementById("chart-hover-point");
 const fullscreenButton = document.getElementById("chart-fullscreen-button");
 const downloadSvgButton = document.getElementById("chart-download-svg-button");
 
-function showHoveredPoint(target) {
-  if (!target || !hoverLine || !hoverPoint || !chartReadout) {
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function chartPoints() {
+  if (!chartSvg) {
+    return [];
+  }
+
+  return Array.from(chartSvg.querySelectorAll(".chart-hit-target"))
+    .map((target) => ({
+      period: target.dataset.period,
+      value: target.dataset.value,
+      x: Number(target.dataset.x),
+      y: Number(target.dataset.y),
+      element: target,
+    }))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+}
+
+function svgCoordinatesFromPointer(event) {
+  if (!chartSvg) {
+    return null;
+  }
+
+  const point = chartSvg.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+
+  const matrix = chartSvg.getScreenCTM();
+
+  if (!matrix) {
+    return null;
+  }
+
+  return point.matrixTransform(matrix.inverse());
+}
+
+function nearestPointByX(x) {
+  const points = chartPoints();
+
+  if (points.length === 0) {
+    return null;
+  }
+
+  return points.reduce((nearest, point) => {
+    const nearestDistance = Math.abs(nearest.x - x);
+    const pointDistance = Math.abs(point.x - x);
+
+    return pointDistance < nearestDistance ? point : nearest;
+  });
+}
+
+function showPoint(point) {
+  if (!point || !hoverLine || !hoverPoint || !chartReadout) {
     return;
   }
 
-  const period = target.dataset.period;
-  const value = target.dataset.value;
-  const x = target.dataset.x;
-  const y = target.dataset.y;
-
-  hoverLine.setAttribute("x1", x);
-  hoverLine.setAttribute("x2", x);
+  hoverLine.setAttribute("x1", point.x);
+  hoverLine.setAttribute("x2", point.x);
   hoverLine.hidden = false;
 
-  hoverPoint.setAttribute("cx", x);
-  hoverPoint.setAttribute("cy", y);
+  hoverPoint.setAttribute("cx", point.x);
+  hoverPoint.setAttribute("cy", point.y);
   hoverPoint.hidden = false;
 
-  chartReadout.innerHTML = `<strong>${period}</strong> · ${value}`;
+  chartReadout.innerHTML = `<strong>${escapeHtml(point.period)}</strong> · ${escapeHtml(point.value)}`;
 }
 
 function clearHoveredPoint() {
@@ -35,6 +88,39 @@ function clearHoveredPoint() {
   if (hoverPoint) {
     hoverPoint.hidden = true;
   }
+}
+
+function handlePointerMove(event) {
+  const coordinates = svgCoordinatesFromPointer(event);
+
+  if (!coordinates || !chartSvg) {
+    return;
+  }
+
+  const plotLeft = Number(chartSvg.dataset.plotLeft);
+  const plotRight = Number(chartSvg.dataset.plotRight);
+  const plotTop = Number(chartSvg.dataset.plotTop);
+  const plotBottom = Number(chartSvg.dataset.plotBottom);
+
+  if (
+    Number.isFinite(plotLeft) &&
+    Number.isFinite(plotRight) &&
+    Number.isFinite(plotTop) &&
+    Number.isFinite(plotBottom)
+  ) {
+    const outsidePlot =
+      coordinates.x < plotLeft ||
+      coordinates.x > plotRight ||
+      coordinates.y < plotTop ||
+      coordinates.y > plotBottom;
+
+    if (outsidePlot) {
+      clearHoveredPoint();
+      return;
+    }
+  }
+
+  showPoint(nearestPointByX(coordinates.x));
 }
 
 function safeFilename(value) {
@@ -53,6 +139,11 @@ function downloadSvg() {
   const clonedSvg = chartSvg.cloneNode(true);
 
   clonedSvg.removeAttribute("id");
+  clonedSvg.removeAttribute("aria-label");
+
+  clonedSvg
+    .querySelectorAll(".chart-hit-target, #chart-hover-line, #chart-hover-point")
+    .forEach((element) => element.remove());
 
   const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
 
@@ -66,7 +157,7 @@ function downloadSvg() {
     .chart-grid {
       stroke: #d0d7de;
       stroke-width: 1;
-      opacity: 0.6;
+      opacity: 0.7;
       vector-effect: non-scaling-stroke;
     }
 
@@ -93,16 +184,9 @@ function downloadSvg() {
       font-size: 14px;
       font-weight: 700;
     }
-
-    .chart-hover-line,
-    .chart-hover-point,
-    .chart-hit-target {
-      display: none;
-    }
   `;
 
   clonedSvg.insertBefore(style, clonedSvg.firstChild);
-
   clonedSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
   const serializer = new XMLSerializer();
@@ -117,11 +201,12 @@ function downloadSvg() {
 
   link.href = url;
   link.download = `${safeFilename(title)}.svg`;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
 
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 async function toggleFullscreen() {
@@ -129,23 +214,21 @@ async function toggleFullscreen() {
     return;
   }
 
-  if (!document.fullscreenElement) {
-    await chartPanel.requestFullscreen();
-    return;
-  }
+  try {
+    if (!document.fullscreenElement) {
+      await chartPanel.requestFullscreen();
+      return;
+    }
 
-  await document.exitFullscreen();
+    await document.exitFullscreen();
+  } catch (error) {
+    console.error("Fullscreen failed", error);
+  }
 }
 
 if (chartSvg) {
-  const hitTargets = chartSvg.querySelectorAll(".chart-hit-target");
-
-  hitTargets.forEach((target) => {
-    target.addEventListener("mouseenter", () => showHoveredPoint(target));
-    target.addEventListener("focus", () => showHoveredPoint(target));
-  });
-
-  chartSvg.addEventListener("mouseleave", clearHoveredPoint);
+  chartSvg.addEventListener("pointermove", handlePointerMove);
+  chartSvg.addEventListener("pointerleave", clearHoveredPoint);
 }
 
 if (fullscreenButton) {

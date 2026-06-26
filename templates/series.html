@@ -140,8 +140,8 @@
 		    · {{ summary.seasonal_adjustment }}
 		  {% endif %}
 
-		  {% if summary.unit %}
-		    · {{ summary.unit }}
+		  {% if display_unit %}
+		    · {{ display_unit }}
 		  {% endif %}
 
 		  {% if summary.base_period %}
@@ -173,14 +173,14 @@
 		  class="series-chart"
 		  viewBox="0 0 {{ chart.width }} {{ chart.height }}"
 		  role="img"
-		  aria-labelledby="series-chart-title series-chart-description"
+		  aria-label="{{ summary.display_name or summary.indicator_name or summary.indicator_code }} from {{ chart.first_period }} to {{ chart.latest_period }}"
 		  preserveAspectRatio="xMidYMid meet"
 		  data-chart-title="{{ summary.display_name or summary.indicator_name or summary.indicator_code }}"
+		  data-plot-left="{{ chart.plot_left }}"
+		  data-plot-right="{{ chart.plot_right }}"
+		  data-plot-top="{{ chart.plot_top }}"
+		  data-plot-bottom="{{ chart.plot_bottom }}"
 		>
-		  <title id="series-chart-title">
-		    {{ summary.display_name or summary.indicator_name or summary.indicator_code }}
-		  </title>
-
 		  <desc id="series-chart-description">
 		    Chart showing observations from {{ chart.first_period }} to {{ chart.latest_period }}.
 		  </desc>
@@ -233,16 +233,13 @@
 
 		  <text
 		    class="chart-axis-title chart-y-axis-title"
-		    x="20"
+		    x="{{ chart.plot_left - 54 }}"
 		    y="{{ (chart.plot_top + chart.plot_bottom) / 2 }}"
 		    text-anchor="middle"
-		    transform="rotate(-90 20 {{ (chart.plot_top + chart.plot_bottom) / 2 }})"
+		    dominant-baseline="middle"
+		    transform="rotate(-90 {{ chart.plot_left - 54 }} {{ (chart.plot_top + chart.plot_bottom) / 2 }})"
 		  >
-		    {% if summary.unit %}
-		      {{ summary.unit }}
-		    {% else %}
-		      Value
-		    {% endif %}
+		    {{ display_unit or "Value" }}
 		  </text>
 
 		  <text
@@ -316,6 +313,7 @@
 	    {% endif %}
 	  </div>
 	</section>
+
 
 
     <section class="card">
@@ -403,5 +401,6 @@
       </p>
     </section>
   </main>
+  <script src="/static/series-chart.js?v=2"></script>
 </body>
 </html>
