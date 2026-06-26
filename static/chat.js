@@ -88,6 +88,97 @@ function buildSeriesMetaParts(row) {
   return parts;
 }
 
+function renderSelectedSeriesCard(row) {
+  const title = escapeHtml(seriesTitle(row));
+  const url = escapeHtml(row.series_url || "#");
+
+  const datasetLabel = escapeHtml(datasetTitle(row));
+  const datasetHref = escapeHtml(datasetUrl(row));
+
+  const metaParts = buildSeriesMetaParts(row)
+    .map((part) => `<span>${escapeHtml(part)}</span>`)
+    .join("");
+
+  const displayName = row.display_name
+    ? `<div class="chat-series-display-name">${escapeHtml(row.display_name)}</div>`
+    : "";
+
+  const codeLine = [
+    row.indicator_code ? `Code: ${row.indicator_code}` : null,
+    row.series_id ? `Series ID: ${row.series_id}` : null,
+    row.observation_count ? `${row.observation_count} observations` : null,
+  ]
+    .filter(Boolean)
+    .map(escapeHtml)
+    .join(" · ");
+
+  return `
+    <li class="chat-series-card">
+      <a class="chat-series-title" href="${url}">${title}</a>
+
+      ${displayName}
+
+      <div class="chat-series-dataset">
+        <a href="${datasetHref}">${datasetLabel}</a>
+      </div>
+
+      <div class="chat-series-meta">
+        ${metaParts}
+      </div>
+
+      <div class="chat-series-code">
+        ${codeLine}
+      </div>
+    </li>
+  `;
+}
+
+function renderReferenceItem(row) {
+  const sourceTitle = escapeHtml(row.source_title || "Reference source");
+  const page = row.page_number ? `PDF page ${escapeHtml(row.page_number)}` : "page not available";
+  const text = escapeHtml((row.chunk_text || "").slice(0, 800));
+  const score = formatScore(row.similarity_score);
+
+  return `
+    <li>
+      <strong>${sourceTitle}</strong> · ${page}${score ? ` · similarity ${score}` : ""}
+      <blockquote>${text}</blockquote>
+    </li>
+  `;
+}
+
+function renderDebugQueryItem(query) {
+  return `<li>${escapeHtml(query)}</li>`;
+}
+
+function renderDebugSeriesItem(row) {
+  const title = escapeHtml(seriesTitle(row));
+  const score = formatScore(row.similarity_score);
+  const url = escapeHtml(row.series_url || "#");
+
+  return `
+    <li>
+      <a href="${url}">${title}</a>
+      ${row.dataset_id ? ` · ${escapeHtml(row.dataset_id)}` : ""}
+      ${row.frequency_name ? ` · ${escapeHtml(row.frequency_name)}` : ""}
+      ${score ? ` · similarity ${score}` : ""}
+    </li>
+  `;
+}
+
+function renderDebugReferenceItem(row) {
+  const sourceTitle = escapeHtml(row.source_title || "Reference source");
+  const score = formatScore(row.similarity_score);
+
+  return `
+    <li>
+      ${sourceTitle}
+      ${row.page_number ? ` · PDF page ${escapeHtml(row.page_number)}` : ""}
+      ${score ? ` · similarity ${score}` : ""}
+    </li>
+  `;
+}
+
 function renderSelectedSeries(seriesRows) {
   if (!selectedSeriesContainer) {
     return;
@@ -98,53 +189,11 @@ function renderSelectedSeries(seriesRows) {
     return;
   }
 
-  const items = seriesRows.map((row) => {
-    const title = escapeHtml(seriesTitle(row));
-    const url = escapeHtml(row.series_url || "#");
-
-    const datasetLabel = escapeHtml(datasetTitle(row));
-    const datasetHref = escapeHtml(datasetUrl(row));
-
-    const metaParts = buildSeriesMetaParts(row)
-      .map((part) => `<span>${escapeHtml(part)}</span>`)
-      .join("");
-
-    const displayName = row.display_name
-      ? `<div class="chat-series-display-name">${escapeHtml(row.display_name)}</div>`
-      : "";
-
-    const codeLine = [
-      row.indicator_code ? `Code: ${row.indicator_code}` : null,
-      row.series_id ? `Series ID: ${row.series_id}` : null,
-      row.observation_count ? `${row.observation_count} observations` : null,
-    ]
-      .filter(Boolean)
-      .map(escapeHtml)
-      .join(" · ");
-
-    return `
-      <li class="chat-series-card">
-        <a class="chat-series-title" href="${url}">${title}</a>
-
-        ${displayName}
-
-        <div class="chat-series-dataset">
-          <a href="${datasetHref}">${datasetLabel}</a>
-        </div>
-
-        <div class="chat-series-meta">
-          ${metaParts}
-        </div>
-
-        <div class="chat-series-code">
-          ${codeLine}
-        </div>
-      </li>
-    `;
-  });
+  const items = seriesRows.map(renderSelectedSeriesCard);
 
   selectedSeriesContainer.innerHTML = `<ul class="chat-series-list">${items.join("")}</ul>`;
 }
+
 
 function renderReferences(referenceRows) {
   if (!referencesContainer) {
@@ -156,22 +205,11 @@ function renderReferences(referenceRows) {
     return;
   }
 
-  const items = referenceRows.map((row) => {
-    const sourceTitle = escapeHtml(row.source_title || "Reference source");
-    const page = row.page_number ? `PDF page ${escapeHtml(row.page_number)}` : "page not available";
-    const text = escapeHtml((row.chunk_text || "").slice(0, 800));
-    const score = formatScore(row.similarity_score);
-
-    return `
-      <li>
-        <strong>${sourceTitle}</strong> · ${page}${score ? ` · similarity ${score}` : ""}
-        <blockquote>${text}</blockquote>
-      </li>
-    `;
-  });
+  const items = referenceRows.map(renderReferenceItem);
 
   referencesContainer.innerHTML = `<ul class="chat-source-list">${items.join("")}</ul>`;
 }
+
 
 function renderDebug(debug) {
   if (!debugContainer) {
@@ -187,41 +225,9 @@ function renderDebug(debug) {
   const candidateSeries = debug.candidate_series || [];
   const candidateReferences = debug.candidate_references || [];
 
-  const queryItems = retrievalQueries
-    .map((query) => `<li>${escapeHtml(query)}</li>`)
-    .join("");
-
-  const seriesItems = candidateSeries
-    .map((row) => {
-      const title = escapeHtml(seriesTitle(row));
-      const score = formatScore(row.similarity_score);
-      const url = escapeHtml(row.series_url || "#");
-
-      return `
-        <li>
-          <a href="${url}">${title}</a>
-          ${row.dataset_id ? ` · ${escapeHtml(row.dataset_id)}` : ""}
-          ${row.frequency_name ? ` · ${escapeHtml(row.frequency_name)}` : ""}
-          ${score ? ` · similarity ${score}` : ""}
-        </li>
-      `;
-    })
-    .join("");
-
-  const referenceItems = candidateReferences
-    .map((row) => {
-      const sourceTitle = escapeHtml(row.source_title || "Reference source");
-      const score = formatScore(row.similarity_score);
-
-      return `
-        <li>
-          ${sourceTitle}
-          ${row.page_number ? ` · PDF page ${escapeHtml(row.page_number)}` : ""}
-          ${score ? ` · similarity ${score}` : ""}
-        </li>
-      `;
-    })
-    .join("");
+  const queryItems = retrievalQueries.map(renderDebugQueryItem).join("");
+  const seriesItems = candidateSeries.map(renderDebugSeriesItem).join("");
+  const referenceItems = candidateReferences.map(renderDebugReferenceItem).join("");
 
   debugContainer.innerHTML = `
     <h3>Retrieval queries</h3>

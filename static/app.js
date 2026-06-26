@@ -46,7 +46,7 @@ function externalLink(url, label) {
   `;
 }
 
-function updateSearchUrl(query, datasetId, mode) {
+function buildSearchUrl(query, datasetId, mode) {
   const params = new URLSearchParams();
 
   if (mode) {
@@ -61,11 +61,160 @@ function updateSearchUrl(query, datasetId, mode) {
     params.set("dataset_id", datasetId);
   }
 
-  const newUrl = params.toString()
+  return params.toString()
     ? `/search?${params.toString()}`
     : "/search";
+}
 
-  window.history.replaceState({}, "", newUrl);
+function updateSearchUrl(query, datasetId, mode) {
+  window.history.replaceState({}, "", buildSearchUrl(query, datasetId, mode));
+}
+
+function renderDatasetOption(dataset) {
+  return `
+    <option value="${escapeHtml(dataset.dataset_id)}">
+      ${escapeHtml(dataset.dataset_id)} — ${escapeHtml(dataset.dataset_title)}
+    </option>
+  `;
+}
+
+function renderDatasetCard(dataset) {
+  return `
+    <article class="dataset-card-compact">
+      <div class="dataset-card-title">
+        <strong>${escapeHtml(dataset.dataset_id)}</strong>
+        ${dataset.dataset_title ? `<span>${escapeHtml(dataset.dataset_title)}</span>` : ""}
+      </div>
+
+      <p class="dataset-card-meta">
+        ${escapeHtml(dataset.series_count)} series
+        ·
+        ${escapeHtml(dataset.observation_count)} observations
+      </p>
+
+      <p class="dataset-card-links">
+        <a href="/browse/datasets/${encodeURIComponent(dataset.dataset_id)}">
+          Browse
+        </a>
+        |
+        <a href="${escapeHtml(dataset.source_url)}" target="_blank" rel="noopener noreferrer">
+          Source
+        </a>
+        ${dataset.documentation_url ? `
+          |
+          <a href="${escapeHtml(dataset.documentation_url)}" target="_blank" rel="noopener noreferrer">
+            Docs
+          </a>
+        ` : ""}
+        ${dataset.metadata_url ? `
+          |
+          <a href="${escapeHtml(dataset.metadata_url)}" target="_blank" rel="noopener noreferrer">
+            Metadata
+          </a>
+        ` : ""}
+      </p>
+    </article>
+  `;
+}
+
+function buildSeriesSearchUrl(query, datasetId, mode) {
+  const endpoint = mode === "semantic"
+    ? "/v1/series/search/semantic"
+    : "/v1/series/search";
+  const params = new URLSearchParams({ q: query, limit: "10" });
+
+  if (datasetId) {
+    params.set("dataset_id", datasetId);
+  }
+
+  return `${endpoint}?${params.toString()}`;
+}
+
+function renderSearchResult(result) {
+  const datasetId = encodeURIComponent(result.dataset_id);
+  const indicatorCode = encodeURIComponent(result.indicator_code);
+
+  const metadataUrl = `/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}`;
+  const csvUrl = `${metadataUrl}/observations.csv?limit=10000`;
+
+  let scoreHtml = "";
+
+  if (result.similarity_score !== undefined && result.similarity_score !== null) {
+    const similarity = Number(result.similarity_score);
+    scoreHtml = `
+      <p class="result-score">
+        Semantic similarity: ${similarity.toFixed(3)}
+      </p>
+    `;
+  }
+
+  const displayName = (
+    result.display_name
+    || result.primary_text
+    || result.indicator_name
+    || result.indicator_code
+  );
+
+  return `
+    <div class="result">
+      <h3>
+        <a href="/series/${datasetId}/${indicatorCode}">
+          ${escapeHtml(displayName)}
+        </a>
+      </h3>
+
+      <p class="result-dataset-link">
+        Dataset:
+        <a href="/browse/datasets/${datasetId}">
+          ${escapeHtml(result.dataset_title || result.dataset_id)}
+        </a>
+        <span class="code">${escapeHtml(result.dataset_id)}</span>
+      </p>
+
+      ${scoreHtml}
+
+      ${result.indicator_name ? `
+        <p class="series-official-name">
+          Official label: ${escapeHtml(result.indicator_name)}
+        </p>
+      ` : ""}
+
+      <p>
+        Indicator code:
+        <span class="code">${escapeHtml(result.indicator_code)}</span>
+      </p>
+
+      <p>
+        Structure:
+        <span class="code">${escapeHtml(result.structure_ref)}</span>
+      </p>
+
+      <p>
+        Frequency: ${escapeHtml(result.frequency_name)}
+        |
+        Period: ${escapeHtml(result.first_period)} to ${escapeHtml(result.latest_period)}
+        |
+        Observations: ${escapeHtml(result.observation_count)}
+      </p>
+
+      <p>
+        <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}" target="_blank" rel="noopener noreferrer">
+          View metadata JSON
+        </a>
+        |
+        <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}/observations?limit=5" target="_blank" rel="noopener noreferrer">
+          View first 5 observations JSON
+        </a>
+        |
+        <a href="${csvUrl}">
+          Download CSV
+        </a>
+        ${externalLink(result.source_url, "Official SDMX source")}
+        ${externalLink(result.documentation_url, "ONS documentation")}
+        ${externalLink(result.metadata_url, "IMF metadata")}
+      </p>
+    </div>
+  `;
 }
 
 function showEmptySearchPrompt() {
@@ -95,11 +244,7 @@ async function loadDatasetSummary() {
 
   datasetSelect.innerHTML = `
     <option value="">All datasets</option>
-    ${data.datasets.map(dataset => `
-      <option value="${escapeHtml(dataset.dataset_id)}">
-        ${escapeHtml(dataset.dataset_id)} — ${escapeHtml(dataset.dataset_title)}
-      </option>
-    `).join("")}
+    ${data.datasets.map(renderDatasetOption).join("")}
   `;
 
   if (initialDatasetId) {
@@ -111,55 +256,20 @@ async function loadDatasetSummary() {
     return;
   }
 
-	datasetSummaryDiv.innerHTML = `
-	  <section class="dataset-panel">
-	    <div class="dataset-panel-header">
-	      <h2>Available datasets</h2>
-	      <p class="muted">
-		${escapeHtml(data.datasets.length)} datasets loaded from source-backed SDMX metadata.
-	      </p>
-	    </div>
+  datasetSummaryDiv.innerHTML = `
+    <section class="dataset-panel">
+      <div class="dataset-panel-header">
+        <h2>Available datasets</h2>
+        <p class="muted">
+          ${escapeHtml(data.datasets.length)} datasets loaded from source-backed SDMX metadata.
+        </p>
+      </div>
 
-	    <div class="dataset-grid">
-	      ${data.datasets.map(dataset => `
-		<article class="dataset-card-compact">
-		  <div class="dataset-card-title">
-		    <strong>${escapeHtml(dataset.dataset_id)}</strong>
-		    ${dataset.dataset_title ? `<span>${escapeHtml(dataset.dataset_title)}</span>` : ""}
-		  </div>
-
-		  <p class="dataset-card-meta">
-		    ${escapeHtml(dataset.series_count)} series
-		    ·
-		    ${escapeHtml(dataset.observation_count)} observations
-		  </p>
-
-		  <p class="dataset-card-links">
-		    <a href="/browse/datasets/${encodeURIComponent(dataset.dataset_id)}">
-		      Browse
-		    </a>
-		    |
-		    <a href="${escapeHtml(dataset.source_url)}" target="_blank" rel="noopener noreferrer">
-		      Source
-		    </a>
-		    ${dataset.documentation_url ? `
-		      |
-		      <a href="${escapeHtml(dataset.documentation_url)}" target="_blank" rel="noopener noreferrer">
-			Docs
-		      </a>
-		    ` : ""}
-		    ${dataset.metadata_url ? `
-		      |
-		      <a href="${escapeHtml(dataset.metadata_url)}" target="_blank" rel="noopener noreferrer">
-			Metadata
-		      </a>
-		    ` : ""}
-		  </p>
-		</article>
-	      `).join("")}
-	    </div>
-	  </section>
-	`;
+      <div class="dataset-grid">
+        ${data.datasets.map(renderDatasetCard).join("")}
+      </div>
+    </section>
+  `;
 }
 
 
@@ -180,19 +290,7 @@ async function runSearch(query, options = {}) {
 
   resultsDiv.innerHTML = "<p>Searching...</p>";
 
-  let url;
-
-  if (selectedMode === "semantic") {
-    url = `/v1/series/search/semantic?q=${encodeURIComponent(trimmedQuery)}&limit=10`;
-  } else {
-    url = `/v1/series/search?q=${encodeURIComponent(trimmedQuery)}&limit=10`;
-  }
-
-  if (selectedDatasetId) {
-    url += `&dataset_id=${encodeURIComponent(selectedDatasetId)}`;
-  }
-
-  const response = await fetch(url);
+  const response = await fetch(buildSeriesSearchUrl(trimmedQuery, selectedDatasetId, selectedMode));
 
   if (!response.ok) {
     resultsDiv.innerHTML = `<p>Search failed: ${response.status}</p>`;
@@ -214,92 +312,7 @@ async function runSearch(query, options = {}) {
   resultsDiv.innerHTML = `
     <h2>${escapeHtml(modeLabel)} results for "${escapeHtml(data.query)}" in ${escapeHtml(datasetLabel)}</h2>
 
-    ${data.results.map(result => {
-      const datasetId = encodeURIComponent(result.dataset_id);
-      const indicatorCode = encodeURIComponent(result.indicator_code);
-
-      const metadataUrl = `/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}`;
-      const csvUrl = `${metadataUrl}/observations.csv?limit=10000`;
-
-      let scoreHtml = "";
-
-      if (result.similarity_score !== undefined && result.similarity_score !== null) {
-        const similarity = Number(result.similarity_score);
-        scoreHtml = `
-          <p class="result-score">
-            Semantic similarity: ${similarity.toFixed(3)}
-          </p>
-        `;
-      }
-
-	const displayName = (
-	  result.display_name
-	  || result.primary_text
-	  || result.indicator_name
-	  || result.indicator_code
-	);
-
-	return `
-	  <div class="result">
-	    <h3>
-	      <a href="/series/${datasetId}/${indicatorCode}">
-		${escapeHtml(displayName)}
-	      </a>
-	    </h3>
-
-	    <p class="result-dataset-link">
-	      Dataset:
-	      <a href="/browse/datasets/${datasetId}">
-		${escapeHtml(result.dataset_title || result.dataset_id)}
-	      </a>
-	      <span class="code">${escapeHtml(result.dataset_id)}</span>
-	    </p>
-
-	    ${scoreHtml}
-
-	    ${result.indicator_name ? `
-	      <p class="series-official-name">
-		Official label: ${escapeHtml(result.indicator_name)}
-	      </p>
-	    ` : ""}
-
-	    <p>
-	      Indicator code:
-	      <span class="code">${escapeHtml(result.indicator_code)}</span>
-	    </p>
-
-          <p>
-            Structure:
-            <span class="code">${escapeHtml(result.structure_ref)}</span>
-          </p>
-
-          <p>
-            Frequency: ${escapeHtml(result.frequency_name)}
-            |
-            Period: ${escapeHtml(result.first_period)} to ${escapeHtml(result.latest_period)}
-            |
-            Observations: ${escapeHtml(result.observation_count)}
-          </p>
-
-          <p>
-	    <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}" target="_blank" rel="noopener noreferrer">
-	      View metadata JSON
-	    </a>
-            |
-            <a href="/v1/datasets/${datasetId}/series/by-indicator/${indicatorCode}/observations?limit=5" target="_blank" rel="noopener noreferrer">
-              View first 5 observations JSON
-            </a>
-            |
-            <a href="${csvUrl}">
-              Download CSV
-            </a>
-            ${externalLink(result.source_url, "Official SDMX source")}
-            ${externalLink(result.documentation_url, "ONS documentation")}
-            ${externalLink(result.metadata_url, "IMF metadata")}
-          </p>
-        </div>
-      `;
-    }).join("")}
+    ${data.results.map(renderSearchResult).join("")}
   `;
 }
 
