@@ -34,10 +34,18 @@
 
       <ul>
         <li><a href="/v1/datasets">/v1/datasets</a></li>
-        <li><a href="/v1/datasets/NAG_GBR">/v1/datasets/NAG_GBR</a></li>
-        <li><a href="/v1/datasets/CPI_GBR">/v1/datasets/CPI_GBR</a></li>
-        <li><a href="/v1/datasets/BOP_GBR">/v1/datasets/BOP_GBR</a></li>
-        <li><a href="/v1/datasets/SBS_GBR">/v1/datasets/SBS_GBR</a></li>
+        {% for dataset in datasets | default([], true) %}
+          <li>
+            <a href="/v1/datasets/{{ dataset.dataset_id }}">
+              /v1/datasets/{{ dataset.dataset_id }}
+            </a>
+            {% if dataset.dataset_title %}
+              <span class="muted">{{ dataset.dataset_title }}</span>
+            {% endif %}
+          </li>
+        {% else %}
+          <li><span class="muted">No datasets are currently available.</span></li>
+        {% endfor %}
       </ul>
     </section>
 
@@ -45,26 +53,18 @@
       <h2>Dataset series</h2>
 
       <ul>
-        <li>
-          <a href="/v1/datasets/NAG_GBR/series?limit=10">
-            /v1/datasets/NAG_GBR/series?limit=10
-          </a>
-        </li>
-        <li>
-          <a href="/v1/datasets/CPI_GBR/series?limit=10">
-            /v1/datasets/CPI_GBR/series?limit=10
-          </a>
-        </li>
-        <li>
-          <a href="/v1/datasets/BOP_GBR/series?limit=10">
-            /v1/datasets/BOP_GBR/series?limit=10
-          </a>
-        </li>
-        <li>
-          <a href="/v1/datasets/SBS_GBR/series?limit=10">
-            /v1/datasets/SBS_GBR/series?limit=10
-          </a>
-        </li>
+        {% for dataset in datasets | default([], true) %}
+          <li>
+            <a href="/v1/datasets/{{ dataset.dataset_id }}/series?limit=10">
+              /v1/datasets/{{ dataset.dataset_id }}/series?limit=10
+            </a>
+            {% if dataset.dataset_title %}
+              <span class="muted">{{ dataset.dataset_title }}</span>
+            {% endif %}
+          </li>
+        {% else %}
+          <li><span class="muted">No dataset series examples are currently available.</span></li>
+        {% endfor %}
       </ul>
     </section>
 

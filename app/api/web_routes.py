@@ -136,10 +136,13 @@ def api_page(request: Request) -> HTMLResponse:
     """
     Human-friendly API landing page.
     """
+    datasets = list_datasets()
+
     return templates.TemplateResponse(
         request=request,
         name="api.html",
         context={
+            "datasets": datasets,
             "active_nav": "api",
         },
     )
