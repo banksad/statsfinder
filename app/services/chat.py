@@ -6,9 +6,9 @@ import re
 from typing import Any
 from urllib.parse import quote
 
-from google import genai
 from google.genai import types
 
+from app.services.gemini import get_genai_client
 from app.services.reference_search import search_reference_chunks
 from app.services.semantic_search import (
     DEFAULT_SEMANTIC_DIMENSION,
@@ -18,20 +18,6 @@ from app.services.semantic_search import (
 
 
 DEFAULT_CHAT_MODEL = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-pro")
-
-
-def get_genai_client() -> genai.Client:
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-
-    if not project:
-        raise RuntimeError("GOOGLE_CLOUD_PROJECT is not set")
-
-    return genai.Client(
-        vertexai=True,
-        project=project,
-        location=location,
-    )
 
 
 def normalise_query(value: str) -> str:
@@ -289,7 +275,9 @@ def extract_json_object(text: str) -> dict[str, Any]:
     cleaned = text.strip()
 
     if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:json)?", "", cleaned.strip(), flags=re.IGNORECASE).strip()
+        cleaned = re.sub(
+            r"^```(?:json)?", "", cleaned.strip(), flags=re.IGNORECASE
+        ).strip()
         cleaned = re.sub(r"```$", "", cleaned.strip()).strip()
 
     try:
@@ -306,7 +294,6 @@ def extract_json_object(text: str) -> dict[str, Any]:
         raise ValueError("Gemini response JSON was not an object")
 
     return parsed
-
 
 
 def candidate_series_for_prompt(row: dict[str, Any]) -> dict[str, Any]:
@@ -385,7 +372,6 @@ def generate_chat_answer(bundle: dict[str, Any]) -> dict[str, Any]:
         "caveat": caveat,
         "raw_model_response": response_text,
     }
-
 
 
 def normalise_int_id(value: Any) -> int | None:
@@ -500,7 +486,9 @@ def ask_chat(
             "candidate_series": bundle.get("series_matches", []),
             "candidate_references": bundle.get("reference_matches", []),
             "selected_series_ids": generation.get("selected_series_ids", []),
-            "selected_reference_chunk_ids": generation.get("selected_reference_chunk_ids", []),
+            "selected_reference_chunk_ids": generation.get(
+                "selected_reference_chunk_ids", []
+            ),
             "raw_model_response": generation.get("raw_model_response"),
         },
     }
