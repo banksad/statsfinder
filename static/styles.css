@@ -672,6 +672,54 @@ th {
   margin-top: 0.35rem;
 }
 
+
+/* Series page */
+
+.series-page {
+  max-width: 980px;
+}
+
+.series-page .card {
+  overflow: hidden;
+}
+
+.series-chart-card {
+  padding-bottom: 1rem;
+}
+
+.series-chart-card h2 {
+  margin-bottom: 0.75rem;
+}
+
+.chart-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  background: var(--surface);
+}
+
+.series-chart {
+  display: block;
+  width: 100%;
+  height: clamp(260px, 42vw, 420px);
+  max-height: 420px;
+}
+
+.chart-caption {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.series-page .table-scroll {
+  max-width: 100%;
+}
+
+
 /* Small screens */
 
 @media (max-width: 700px) {
