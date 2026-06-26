@@ -113,7 +113,17 @@ Main components:
 ```text
 app/
   api/
-    main.py              FastAPI application
+    main.py              FastAPI app factory and router registration
+    web_routes.py        HTML page routes
+    v1_routes.py         Versioned JSON API routes
+    chat_routes.py       Experimental grounded chat routes
+    exports.py           CSV and resource URL export helpers
+  services/
+    postgres.py          Database query/service helpers
+    semantic_search.py   Optional pgvector/Gemini semantic search
+    reference_search.py  Source/reference retrieval helpers
+    chat.py              Grounded chat orchestration helpers
+  charts.py              Server-side chart data and SVG helpers
 
 templates/
   index.html             Search page
@@ -154,8 +164,9 @@ infra/
 
 Quick orientation for contributors:
 
-* `app/api/` is the FastAPI/web layer. It serves JSON endpoints, lightweight HTML pages, CSV exports, and experimental chat routes while keeping routing simple.
-* `scripts/query_postgres.py` and related backend modules contain the current database/service logic used by both CLI workflows and the web layer. Commands that query series, run smoke tests, or serve pages need a populated Postgres database and `ONS_SDMX_DB_DSN`.
+* `app/api/` is the FastAPI/web layer. `app/api/main.py` creates the application, mounts static assets, and registers routers; route implementations live in focused modules such as `app/api/web_routes.py`, `app/api/v1_routes.py`, and `app/api/chat_routes.py`. CSV/resource export helpers live in `app/api/exports.py`.
+* `app/services/` contains the database-backed service logic used by the web/API routes, including Postgres queries, optional semantic search, reference retrieval, and grounded chat orchestration. `app/charts.py` contains the server-side chart formatting and SVG data helpers used by series pages. Commands that query series, run smoke tests, or serve pages need a populated Postgres database and `ONS_SDMX_DB_DSN`.
+* `scripts/query_postgres.py` is a CLI-oriented database query helper. Ingestion, smoke-test, and maintenance scripts share the same database assumptions as the web layer but should not be treated as the primary home for application service logic.
 * Ingestion scripts such as `scripts/parse_dataset_to_records.py`, `scripts/load_dataset_to_postgres.py`, and `scripts/upsert_series_search_documents.py` parse registered source datasets and write normalized records/search documents to Postgres. Loader/upsert commands require a reachable Postgres database; embedding generation additionally requires Gemini/Google Cloud environment variables such as `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_ENTERPRISE`.
 * `sql/` holds ordered migration/schema files for the core tables and semantic-search/embedding support. Apply these before running database-backed commands on a fresh database.
 * `docs/` contains the deeper architecture references for the API, CLI, search, browse, chat, and overall system design. Keep README notes high-level and update the docs when changing architecture details. Every design change should reinforce the same constraint: keep the product lightweight and simple.
