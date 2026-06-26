@@ -9,7 +9,7 @@ from typing import Any
 from google import genai
 from google.genai.types import EmbedContentConfig
 
-from scripts.query_postgres import get_connection
+from app.services.postgres import get_connection
 
 
 DEFAULT_MODEL = "gemini-embedding-2"

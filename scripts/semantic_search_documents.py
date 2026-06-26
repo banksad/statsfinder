@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any
 
-from scripts.query_postgres import get_connection
+from app.services.postgres import get_connection
 
 
 DOCUMENT_VERSION = "semantic-document-v1"

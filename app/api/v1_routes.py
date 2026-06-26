@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import Response
 
 from app.api.exports import build_observations_csv, safe_filename_component
-from scripts.query_postgres import (
+from app.services.postgres import (
     build_observations_by_indicator_response,
     build_search_response,
     get_database_health,
@@ -17,7 +17,7 @@ from scripts.query_postgres import (
     list_series_for_dataset,
     search_series,
 )
-from scripts.semantic_search_backend import (
+from app.services.semantic_search import (
     DEFAULT_SEMANTIC_DIMENSION,
     DEFAULT_SEMANTIC_MODEL,
     semantic_search_series,

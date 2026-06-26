@@ -10,7 +10,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from scripts.dataset_registry import get_dataset_config
-from scripts.query_postgres import get_dsn
+from app.services.postgres import get_dsn
 
 
 def load_json(path: Path) -> Any:

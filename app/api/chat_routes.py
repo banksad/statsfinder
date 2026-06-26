@@ -8,8 +8,8 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path as FilePath
 from pydantic import BaseModel
 
-from scripts.chat_backend import ask_chat, build_chat_retrieval_bundle
-from scripts.query_postgres import list_datasets
+from app.services.chat import ask_chat, build_chat_retrieval_bundle
+from app.services.postgres import list_datasets
 
 BASE_DIR = FilePath(__file__).resolve().parents[2]
 TEMPLATES_DIR = BASE_DIR / "templates"

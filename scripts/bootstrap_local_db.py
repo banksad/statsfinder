@@ -8,7 +8,7 @@ from pathlib import Path
 
 import psycopg
 
-from scripts.query_postgres import get_dsn
+from app.services.postgres import get_dsn
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

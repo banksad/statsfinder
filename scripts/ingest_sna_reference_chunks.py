@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types
 from pypdf import PdfReader
 
-from scripts.query_postgres import get_connection
+from app.services.postgres import get_connection
 
 
 SOURCE_ID = "sna2008"

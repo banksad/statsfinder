@@ -9,14 +9,14 @@ from fastapi.templating import Jinja2Templates
 
 from app.api.exports import build_series_resource_urls
 from app.charts import build_display_unit_label, build_line_chart_data
-from scripts.query_postgres import (
+from app.services.postgres import (
     get_dataset,
     get_series_observations_by_indicator,
     get_series_summary_by_indicator,
     list_datasets,
     list_series_for_dataset,
 )
-from scripts.semantic_search_backend import (
+from app.services.semantic_search import (
     DEFAULT_SEMANTIC_DIMENSION,
     DEFAULT_SEMANTIC_MODEL,
     semantic_search_series,
