@@ -8,6 +8,14 @@ from google import genai
 from google.genai.types import EmbedContentConfig
 
 from scripts.query_postgres import get_connection
+from scripts.series_sql import (
+    OBSERVATION_SUMMARY_CTE,
+    OBSERVATION_SUMMARY_SELECT,
+    display_name_select,
+    frequency_select,
+    parsed_metadata_select,
+    search_document_metadata_select,
+)
 
 
 DEFAULT_SEMANTIC_MODEL = "gemini-embedding-2"
@@ -105,78 +113,21 @@ def search_series_by_embedding(
     where_clause = "WHERE " + " AND ".join(where_parts)
 
     sql = f"""
-        WITH ranked AS (
+        WITH {OBSERVATION_SUMMARY_CTE},
+        ranked AS (
             SELECT
-                d.series_id,
-                d.dataset_id,
-                datasets.title AS dataset_title,
-                datasets.source_url,
-                datasets.documentation_url,
-                datasets.metadata_url,
-                datasets.structure_ref,
-                d.series_key,
-                d.indicator_code,
-                d.indicator_name,
-                d.primary_text,
-                COALESCE(
-                    CASE
-                        WHEN d.dataset_id = 'BOP_GBR' THEN (
-                            SELECT string_agg(cleaned_part, ', ' ORDER BY ord)
-                            FROM (
-                                SELECT
-                                    h.ord,
-                                    NULLIF(
-                                        trim(
-                                            regexp_replace(
-                                                h.value,
-                                                '\\s*\\[BPM6\\]',
-                                                '',
-                                                'g'
-                                            )
-                                        ),
-                                        ''
-                                    ) AS cleaned_part
-                                FROM jsonb_array_elements_text(
-                                    d.parsed_metadata -> 'hierarchy'
-                                ) WITH ORDINALITY AS h(value, ord)
-                                WHERE h.ord > 1
-                                  AND h.value <> 'Current Account'
-                            ) parts
-                            WHERE cleaned_part IS NOT NULL
-                        )
-
-                        WHEN d.dataset_id = 'SBS_GBR' THEN (
-                            SELECT string_agg(h.value, ', ' ORDER BY h.ord)
-                            FROM jsonb_array_elements_text(
-                                d.parsed_metadata -> 'hierarchy'
-                            ) WITH ORDINALITY AS h(value, ord)
-                            WHERE h.ord > 2
-                        )
-
-                        WHEN d.dataset_id = 'CPI_GBR' THEN (
-                            SELECT string_agg(h.value, ', ' ORDER BY h.ord)
-                            FROM jsonb_array_elements_text(
-                                d.parsed_metadata -> 'hierarchy'
-                            ) WITH ORDINALITY AS h(value, ord)
-                            WHERE h.ord > 1
-                        )
-
-                        ELSE
-                            d.primary_text
-                    END,
-                    d.primary_text,
-                    d.indicator_name,
-                    d.indicator_code
-                ) AS display_name,
-                d.parsed_metadata ->> 'measure_type' AS measure_type,
-                d.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
-                d.parsed_metadata ->> 'unit' AS unit,
-                d.parsed_metadata ->> 'base_period' AS base_period,
-                d.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
+{search_document_metadata_select("d", "datasets")},
+                {display_name_select(
+                    dataset_id_expression="d.dataset_id",
+                    parsed_metadata_expression="d.parsed_metadata",
+                    primary_text_expression="d.primary_text",
+                    indicator_name_expression="d.indicator_name",
+                    indicator_code_expression="d.indicator_code",
+                )},
+{parsed_metadata_select("d.parsed_metadata")},
                 d.embedding_text,
                 d.keyword_text,
-                s.dimension_values ->> 'FREQ' AS frequency_code,
-                s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
+{frequency_select('s')},
                 e.embedding <=> %(query_embedding)s::vector AS cosine_distance
             FROM series_embeddings e
             JOIN series_search_documents d
@@ -209,38 +160,13 @@ def search_series_by_embedding(
             ranked.keyword_text,
             ranked.frequency_code,
             ranked.frequency_name,
-            MIN(o.time_period) AS first_period,
-            MAX(o.time_period) AS latest_period,
-            COUNT(o.observation_id) AS observation_count,
+{OBSERVATION_SUMMARY_SELECT.rstrip()},
             ranked.cosine_distance,
             1.0 - ranked.cosine_distance AS similarity_score
         FROM ranked
-        LEFT JOIN observations o
-            ON o.series_id = ranked.series_id
+        LEFT JOIN observation_summary
+            ON observation_summary.series_id = ranked.series_id
         WHERE 1.0 - ranked.cosine_distance >= %(min_similarity)s
-        GROUP BY
-            ranked.series_id,
-            ranked.dataset_id,
-            ranked.dataset_title,
-            ranked.source_url,
-            ranked.documentation_url,
-            ranked.metadata_url,
-            ranked.structure_ref,
-            ranked.series_key,
-            ranked.indicator_code,
-            ranked.indicator_name,
-            ranked.primary_text,
-            ranked.display_name,
-            ranked.measure_type,
-            ranked.seasonal_adjustment,
-            ranked.unit,
-            ranked.base_period,
-            ranked.unit_multiplier,
-            ranked.embedding_text,
-            ranked.keyword_text,
-            ranked.frequency_code,
-            ranked.frequency_name,
-            ranked.cosine_distance
         ORDER BY
             ranked.cosine_distance
         LIMIT %(limit)s;

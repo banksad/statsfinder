@@ -8,6 +8,16 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+from scripts.series_sql import (
+    OBSERVATION_SUMMARY_CTE,
+    OBSERVATION_SUMMARY_SELECT,
+    dataset_series_metadata_select,
+    display_name_select,
+    frequency_select,
+    observation_summary_cte,
+    parsed_metadata_select,
+)
+
 
 DB_DSN = os.environ.get(
     "ONS_SDMX_DB_DSN",
@@ -175,84 +185,13 @@ def list_series_for_dataset(
     Where available, it uses the cleaned semantic-search document metadata
     to provide a friendlier display name and parsed fields.
     """
-    sql = """
-        WITH observation_summary AS (
-            SELECT
-                series_id,
-                MIN(time_period) AS first_period,
-                MAX(time_period) AS latest_period,
-                COUNT(observation_id) AS observation_count
-            FROM observations
-            GROUP BY series_id
-        )
+    sql = f"""
+        WITH {OBSERVATION_SUMMARY_CTE}
         SELECT
-            s.series_id,
-            d.dataset_id,
-            d.title AS dataset_title,
-            d.source_url,
-            d.documentation_url,
-            d.metadata_url,
-            d.structure_ref,
-            s.series_key,
-            s.dimension_values ->> 'INDICATOR' AS indicator_code,
-            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
-            COALESCE(
-                CASE
-                    WHEN s.dataset_id = 'BOP_GBR' THEN (
-                        SELECT string_agg(cleaned_part, ', ' ORDER BY ord)
-                        FROM (
-                            SELECT
-                                h.ord,
-                                NULLIF(
-                                    trim(
-                                        regexp_replace(
-                                            h.value,
-                                            '\\s*\\[BPM6\\]',
-                                            '',
-                                            'g'
-                                        )
-                                    ),
-                                    ''
-                                ) AS cleaned_part
-                            FROM jsonb_array_elements_text(sd.parsed_metadata -> 'hierarchy')
-                                WITH ORDINALITY AS h(value, ord)
-                            WHERE h.ord > 1
-                              AND h.value <> 'Current Account'
-                        ) parts
-                        WHERE cleaned_part IS NOT NULL
-                    )
-
-                    WHEN s.dataset_id = 'SBS_GBR' THEN (
-                        SELECT string_agg(h.value, ', ' ORDER BY h.ord)
-                        FROM jsonb_array_elements_text(sd.parsed_metadata -> 'hierarchy')
-                            WITH ORDINALITY AS h(value, ord)
-                        WHERE h.ord > 2
-                    )
-
-                    WHEN s.dataset_id = 'CPI_GBR' THEN (
-                        SELECT string_agg(h.value, ', ' ORDER BY h.ord)
-                        FROM jsonb_array_elements_text(sd.parsed_metadata -> 'hierarchy')
-                            WITH ORDINALITY AS h(value, ord)
-                        WHERE h.ord > 1
-                    )
-
-                    ELSE
-                        sd.primary_text
-                END,
-                sd.primary_text,
-                s.dimension_labels -> 'INDICATOR' ->> 'name',
-                s.dimension_values ->> 'INDICATOR'
-            ) AS display_name,
-            sd.parsed_metadata ->> 'measure_type' AS measure_type,
-            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
-            sd.parsed_metadata ->> 'unit' AS unit,
-            sd.parsed_metadata ->> 'base_period' AS base_period,
-            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
-            s.dimension_values ->> 'FREQ' AS frequency_code,
-            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            observation_summary.first_period,
-            observation_summary.latest_period,
-            COALESCE(observation_summary.observation_count, 0) AS observation_count
+{dataset_series_metadata_select("s", "d")},{display_name_select()},
+{parsed_metadata_select()},
+{frequency_select()},
+{OBSERVATION_SUMMARY_SELECT.rstrip()}
         FROM series s
         JOIN datasets d
             ON d.dataset_id = s.dataset_id
@@ -308,41 +247,12 @@ def search_series(
     where_sql = " AND ".join(where_clauses)
 
     sql = f"""
-        WITH observation_summary AS (
-            SELECT
-                series_id,
-                MIN(time_period) AS first_period,
-                MAX(time_period) AS latest_period,
-                COUNT(observation_id) AS observation_count
-            FROM observations
-            GROUP BY series_id
-        )
+        WITH {OBSERVATION_SUMMARY_CTE}
         SELECT
-            s.series_id,
-            s.dataset_id,
-            d.title AS dataset_title,
-            d.source_url,
-            d.documentation_url,
-            d.metadata_url,
-            d.structure_ref,
-            s.series_key,
-            s.dimension_values ->> 'INDICATOR' AS indicator_code,
-            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
-            COALESCE(
-                sd.primary_text,
-                s.dimension_labels -> 'INDICATOR' ->> 'name',
-                s.dimension_values ->> 'INDICATOR'
-            ) AS display_name,
-            sd.parsed_metadata ->> 'measure_type' AS measure_type,
-            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
-            sd.parsed_metadata ->> 'unit' AS unit,
-            sd.parsed_metadata ->> 'base_period' AS base_period,
-            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
-            s.dimension_values ->> 'FREQ' AS frequency_code,
-            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            observation_summary.first_period,
-            observation_summary.latest_period,
-            COALESCE(observation_summary.observation_count, 0) AS observation_count
+{dataset_series_metadata_select()},{display_name_select(use_dataset_case=False)},
+{parsed_metadata_select()},
+{frequency_select()},
+{OBSERVATION_SUMMARY_SELECT.rstrip()}
         FROM series s
         JOIN datasets d
             ON d.dataset_id = s.dataset_id
@@ -371,44 +281,13 @@ def get_series_summary(series_id: int) -> dict[str, Any] | None:
     """
     Return one summary row for a series using its internal series_id.
     """
-    sql = """
-        WITH observation_summary AS (
-            SELECT
-                series_id,
-                MIN(time_period) AS first_period,
-                MAX(time_period) AS latest_period,
-                COUNT(observation_id) AS observation_count
-            FROM observations
-            GROUP BY series_id
-        )
+    sql = f"""
+        WITH {OBSERVATION_SUMMARY_CTE}
         SELECT
-            s.series_id,
-            s.dataset_id,
-            d.title AS dataset_title,
-            d.source_url,
-            d.documentation_url,
-            d.metadata_url,
-            d.structure_ref,
-            s.series_key,
-            s.dimension_values,
-            s.dimension_labels,
-            s.dimension_values ->> 'INDICATOR' AS indicator_code,
-            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
-            COALESCE(
-                sd.primary_text,
-                s.dimension_labels -> 'INDICATOR' ->> 'name',
-                s.dimension_values ->> 'INDICATOR'
-            ) AS display_name,
-            sd.parsed_metadata ->> 'measure_type' AS measure_type,
-            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
-            sd.parsed_metadata ->> 'unit' AS unit,
-            sd.parsed_metadata ->> 'base_period' AS base_period,
-            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
-            s.dimension_values ->> 'FREQ' AS frequency_code,
-            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            observation_summary.first_period,
-            observation_summary.latest_period,
-            COALESCE(observation_summary.observation_count, 0) AS observation_count
+{dataset_series_metadata_select(include_dimension_json=True)},{display_name_select(use_dataset_case=False)},
+{parsed_metadata_select()},
+{frequency_select()},
+{OBSERVATION_SUMMARY_SELECT.rstrip()}
         FROM series s
         JOIN datasets d
             ON d.dataset_id = s.dataset_id
@@ -437,7 +316,7 @@ def get_series_summary_by_indicator(
     When series_id is supplied, it disambiguates exact annual/quarterly
     variants that share the same indicator code.
     """
-    sql = """
+    sql = f"""
         WITH selected_series AS (
             SELECT
                 s.series_id
@@ -449,46 +328,17 @@ def get_series_summary_by_indicator(
                 s.series_id
             LIMIT 1
         ),
-        observation_summary AS (
-            SELECT
-                o.series_id,
-                MIN(o.time_period) AS first_period,
-                MAX(o.time_period) AS latest_period,
-                COUNT(o.observation_id) AS observation_count
-            FROM observations o
-            JOIN selected_series selected
-                ON selected.series_id = o.series_id
-            GROUP BY
-                o.series_id
-        )
+        {observation_summary_cte(
+            observations_alias="o",
+            series_id_expression="o.series_id",
+            join_clause="JOIN selected_series selected ON selected.series_id = o.series_id",
+            group_by_expression="o.series_id",
+        )}
         SELECT
-            s.series_id,
-            s.dataset_id,
-            d.title AS dataset_title,
-            d.source_url,
-            d.documentation_url,
-            d.metadata_url,
-            d.structure_ref,
-            s.series_key,
-            s.dimension_values,
-            s.dimension_labels,
-            s.dimension_values ->> 'INDICATOR' AS indicator_code,
-            s.dimension_labels -> 'INDICATOR' ->> 'name' AS indicator_name,
-            COALESCE(
-                sd.primary_text,
-                s.dimension_labels -> 'INDICATOR' ->> 'name',
-                s.dimension_values ->> 'INDICATOR'
-            ) AS display_name,
-            sd.parsed_metadata ->> 'measure_type' AS measure_type,
-            sd.parsed_metadata ->> 'seasonal_adjustment' AS seasonal_adjustment,
-            sd.parsed_metadata ->> 'unit' AS unit,
-            sd.parsed_metadata ->> 'base_period' AS base_period,
-            sd.parsed_metadata ->> 'unit_multiplier' AS unit_multiplier,
-            s.dimension_values ->> 'FREQ' AS frequency_code,
-            s.dimension_labels -> 'FREQ' ->> 'name' AS frequency_name,
-            observation_summary.first_period,
-            observation_summary.latest_period,
-            COALESCE(observation_summary.observation_count, 0) AS observation_count
+{dataset_series_metadata_select(include_dimension_json=True)},{display_name_select(use_dataset_case=False)},
+{parsed_metadata_select()},
+{frequency_select()},
+{OBSERVATION_SUMMARY_SELECT.rstrip()}
         FROM selected_series selected
         JOIN series s
             ON s.series_id = selected.series_id
