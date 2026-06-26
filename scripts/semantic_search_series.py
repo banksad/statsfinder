@@ -1,65 +1,21 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from collections.abc import Sequence
 from typing import Any
 
-from google import genai
-from google.genai.types import EmbedContentConfig
-
+from app.services.gemini import (
+    embed_query,
+    get_genai_client,
+    require_gemini_environment,
+    vector_literal,
+)
 from app.services.postgres import get_connection
 
 
 DEFAULT_MODEL = "gemini-embedding-2"
 DEFAULT_DIMENSION = 768
-
-
-def require_environment() -> None:
-    required_names = [
-        "GOOGLE_CLOUD_PROJECT",
-        "GOOGLE_CLOUD_LOCATION",
-        "GOOGLE_GENAI_USE_ENTERPRISE",
-    ]
-
-    missing = [name for name in required_names if not os.getenv(name)]
-
-    if missing:
-        raise RuntimeError(
-            "Missing required environment variables: "
-            + ", ".join(missing)
-        )
-
-
-def vector_literal(values: Sequence[float]) -> str:
-    return "[" + ",".join(str(float(value)) for value in values) + "]"
-
-
-def embed_query(
-    client: genai.Client,
-    query: str,
-    model: str,
-    output_dimensionality: int,
-) -> list[float]:
-    response = client.models.embed_content(
-        model=model,
-        contents=[query],
-        config=EmbedContentConfig(
-            task_type="RETRIEVAL_QUERY",
-            output_dimensionality=output_dimensionality,
-        ),
-    )
-
-    if not response.embeddings:
-        raise RuntimeError("Gemini returned no embeddings.")
-
-    values = response.embeddings[0].values
-
-    if values is None:
-        raise RuntimeError("Gemini returned an embedding with no values.")
-
-    return [float(value) for value in values]
 
 
 def semantic_search(
@@ -187,15 +143,15 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    require_environment()
+    require_gemini_environment()
 
-    client = genai.Client()
+    client = get_genai_client()
 
     query_embedding = embed_query(
-        client=client,
         query=args.query,
         model=args.model,
         output_dimensionality=args.embedding_dim,
+        client=client,
     )
 
     rows = semantic_search(

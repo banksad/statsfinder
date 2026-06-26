@@ -7,10 +7,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from google import genai
-from google.genai import types
 from pypdf import PdfReader
 
+from app.services.gemini import embed_texts, get_genai_client, vector_literal
 from app.services.postgres import get_connection
 
 
@@ -35,41 +34,20 @@ def content_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def vector_literal(values: list[float]) -> str:
-    return "[" + ",".join(str(float(value)) for value in values) + "]"
-
-
-def get_genai_client() -> genai.Client:
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-
-    if not project:
-        raise RuntimeError("GOOGLE_CLOUD_PROJECT is not set")
-
-    return genai.Client(
-        vertexai=True,
-        project=project,
-        location=location,
-    )
-
-
 def embed_text(
-    client: genai.Client,
+    client: object,
     text: str,
     model: str,
     embedding_dim: int,
     task_type: str,
 ) -> list[float]:
-    response = client.models.embed_content(
+    return embed_texts(
+        texts=[text],
         model=model,
-        contents=text,
-        config=types.EmbedContentConfig(
-            output_dimensionality=embedding_dim,
-            task_type=task_type,
-        ),
-    )
-
-    return list(response.embeddings[0].values)
+        output_dimensionality=embedding_dim,
+        task_type=task_type,
+        client=client,
+    )[0]
 
 
 def chunk_words(
@@ -110,7 +88,9 @@ def extract_pdf_chunks(
     chunks: list[dict[str, Any]] = []
 
     first_index = 0 if start_page is None else max(0, start_page - 1)
-    last_index = len(reader.pages) if end_page is None else min(len(reader.pages), end_page)
+    last_index = (
+        len(reader.pages) if end_page is None else min(len(reader.pages), end_page)
+    )
 
     for page_index in range(first_index, last_index):
         page = reader.pages[page_index]

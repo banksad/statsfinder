@@ -3,9 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from google import genai
-from google.genai import types
-
+from app.services.gemini import embed_query, vector_literal
 from app.services.postgres import get_connection
 
 
@@ -18,41 +16,16 @@ DEFAULT_REFERENCE_DIMENSION = int(
 )
 
 
-def vector_literal(values: list[float]) -> str:
-    return "[" + ",".join(str(float(value)) for value in values) + "]"
-
-
-def get_genai_client() -> genai.Client:
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-
-    if not project:
-        raise RuntimeError("GOOGLE_CLOUD_PROJECT is not set")
-
-    return genai.Client(
-        vertexai=True,
-        project=project,
-        location=location,
-    )
-
-
 def embed_reference_query(
     query: str,
     model: str = DEFAULT_REFERENCE_MODEL,
     embedding_dim: int = DEFAULT_REFERENCE_DIMENSION,
 ) -> list[float]:
-    client = get_genai_client()
-
-    response = client.models.embed_content(
+    return embed_query(
+        query=query,
         model=model,
-        contents=query,
-        config=types.EmbedContentConfig(
-            output_dimensionality=embedding_dim,
-            task_type="RETRIEVAL_QUERY",
-        ),
+        output_dimensionality=embedding_dim,
     )
-
-    return list(response.embeddings[0].values)
 
 
 def search_reference_chunks(

@@ -1,48 +1,23 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import time
 from collections.abc import Sequence
 from typing import Any
 
-from google import genai
-from google.genai.types import EmbedContentConfig
-
+from app.services.gemini import (
+    embed_texts,
+    get_genai_client,
+    require_gemini_environment,
+    vector_literal,
+)
 from app.services.postgres import get_connection
 
 
 DEFAULT_MODEL = "gemini-embedding-2"
 DEFAULT_DIMENSION = 768
 DEFAULT_TASK_TYPE = "RETRIEVAL_DOCUMENT"
-
-
-def require_environment() -> None:
-    required_names = [
-        "GOOGLE_CLOUD_PROJECT",
-        "GOOGLE_CLOUD_LOCATION",
-        "GOOGLE_GENAI_USE_ENTERPRISE",
-    ]
-
-    missing = [name for name in required_names if not os.getenv(name)]
-
-    if missing:
-        raise RuntimeError(
-            "Missing required environment variables: "
-            + ", ".join(missing)
-        )
-
-
-def vector_literal(values: Sequence[float]) -> str:
-    """
-    Convert a Python sequence of floats into pgvector literal syntax.
-
-    Example:
-      [0.1, 0.2, 0.3]
-      -> "[0.1,0.2,0.3]"
-    """
-    return "[" + ",".join(str(float(value)) for value in values) + "]"
 
 
 def fetch_documents_to_embed(
@@ -108,31 +83,20 @@ def fetch_documents_to_embed(
 
 
 def embed_text(
-    client: genai.Client,
+    client: object,
     model: str,
     text: str,
     title: str | None,
     output_dimensionality: int,
 ) -> list[float]:
-    response = client.models.embed_content(
+    return embed_texts(
+        texts=[text],
         model=model,
-        contents=[text],
-        config=EmbedContentConfig(
-            task_type=DEFAULT_TASK_TYPE,
-            output_dimensionality=output_dimensionality,
-            title=title,
-        ),
-    )
-
-    if not response.embeddings:
-        raise RuntimeError("Gemini returned no embeddings.")
-
-    values = response.embeddings[0].values
-
-    if values is None:
-        raise RuntimeError("Gemini returned an embedding with no values.")
-
-    return [float(value) for value in values]
+        output_dimensionality=output_dimensionality,
+        task_type=DEFAULT_TASK_TYPE,
+        title=title,
+        client=client,
+    )[0]
 
 
 def upsert_embedding(
@@ -143,8 +107,7 @@ def upsert_embedding(
 ) -> None:
     if len(embedding_values) != embedding_dim:
         raise ValueError(
-            f"Expected {embedding_dim} embedding values, "
-            f"got {len(embedding_values)}."
+            f"Expected {embedding_dim} embedding values, got {len(embedding_values)}."
         )
 
     sql = """
@@ -248,7 +211,7 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    require_environment()
+    require_gemini_environment()
 
     documents = fetch_documents_to_embed(
         dataset_id=args.dataset_id,
@@ -275,7 +238,7 @@ def main() -> int:
         print("Dry run: not calling Gemini and not writing embeddings.")
         return 0
 
-    client = genai.Client()
+    client = get_genai_client()
 
     for index, document in enumerate(documents, start=1):
         print(
