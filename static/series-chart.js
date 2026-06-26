@@ -6,15 +6,6 @@ const hoverPoint = document.getElementById("chart-hover-point");
 const fullscreenButton = document.getElementById("chart-fullscreen-button");
 const downloadSvgButton = document.getElementById("chart-download-svg-button");
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function chartPoints() {
   if (!chartSvg) {
     return [];

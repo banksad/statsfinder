@@ -7,15 +7,6 @@ const referencesContainer = document.getElementById("chat-references");
 const debugContainer = document.getElementById("chat-debug");
 const submitButton = document.getElementById("chat-submit-button");
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function formatScore(value) {
   const number = Number(value);
 
