@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.dataset_registry import get_dataset_config
+from scripts.common.dataset_registry import get_dataset_config
 
 
 CODELIST_LOOKUP_PATH = Path("data/processed/ecofin_codelist_lookup.json")

@@ -6,7 +6,7 @@ from typing import Any
 from psycopg.types.json import Jsonb
 
 from app.services.postgres import get_connection
-from scripts.semantic_search_documents import (
+from scripts.search.semantic_search_documents import (
     build_search_document,
     fetch_series_rows,
 )

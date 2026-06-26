@@ -554,12 +554,12 @@ def build_parser() -> argparse.ArgumentParser:
     Build the command-line interface.
 
     Examples:
-        python -m scripts.query_postgres search "real gdp"
-        python -m scripts.query_postgres search "real gdp" --json
-        python -m scripts.query_postgres summary 11
-        python -m scripts.query_postgres summary-by-indicator GGO_GBR GRT_G14_GG_XDC --series-id 123
-        python -m scripts.query_postgres observations 11 --limit 5
-        python -m scripts.query_postgres observations-by-indicator GGO_GBR GRT_G14_GG_XDC --series-id 123 --limit 5
+        python -m scripts.db.query_postgres search "real gdp"
+        python -m scripts.db.query_postgres search "real gdp" --json
+        python -m scripts.db.query_postgres summary 11
+        python -m scripts.db.query_postgres summary-by-indicator GGO_GBR GRT_G14_GG_XDC --series-id 123
+        python -m scripts.db.query_postgres observations 11 --limit 5
+        python -m scripts.db.query_postgres observations-by-indicator GGO_GBR GRT_G14_GG_XDC --series-id 123 --limit 5
     """
     parser = argparse.ArgumentParser(
         description="Query the local ONS SDMX Postgres database."

@@ -140,13 +140,12 @@ static/
   chat.js                Plain JavaScript chat UI
 
 scripts/
-  parse_dataset_to_records.py
-  enrich_dataset_series.py
-  load_dataset_to_postgres.py
-  bootstrap_local_db.py
-  upsert_series_search_documents.py
-  embed_series_search_documents.py
-  ingest_sna_reference_chunks.py
+  common/               Shared script utilities and dataset registry helpers
+  ingest/               Dataset parsing/loading, enrichment, and search document ingestion
+  db/                   Local database bootstrap and query CLIs
+  inspect/              SDMX/codelist inspection and preview helpers
+  search/               Semantic search command and document-building helpers
+  smoke/                Local smoke tests and embedding environment checks
 
 sql/
   001_create_core_tables.sql
@@ -166,8 +165,8 @@ Quick orientation for contributors:
 
 * `app/api/` is the FastAPI/web layer. `app/api/main.py` creates the application, mounts static assets, and registers routers; route implementations live in focused modules such as `app/api/web_routes.py`, `app/api/v1_routes.py`, and `app/api/chat_routes.py`. CSV/resource export helpers live in `app/api/exports.py`.
 * `app/services/` contains the database-backed service logic used by the web/API routes, including Postgres queries, optional semantic search, reference retrieval, and grounded chat orchestration. `app/charts.py` contains the server-side chart formatting and SVG data helpers used by series pages. Commands that query series, run smoke tests, or serve pages need a populated Postgres database and `ONS_SDMX_DB_DSN`.
-* `scripts/query_postgres.py` is a CLI-oriented database query helper. Ingestion, smoke-test, and maintenance scripts share the same database assumptions as the web layer but should not be treated as the primary home for application service logic.
-* Ingestion scripts such as `scripts/parse_dataset_to_records.py`, `scripts/load_dataset_to_postgres.py`, and `scripts/upsert_series_search_documents.py` parse registered source datasets and write normalized records/search documents to Postgres. Loader/upsert commands require a reachable Postgres database; embedding generation additionally requires Gemini/Google Cloud environment variables such as `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_ENTERPRISE`.
+* `scripts/db/query_postgres.py` is a CLI-oriented database query helper. Ingestion, smoke-test, and maintenance scripts share the same database assumptions as the web layer but should not be treated as the primary home for application service logic.
+* Ingestion scripts such as `scripts/ingest/parse_dataset_to_records.py`, `scripts/ingest/load_dataset_to_postgres.py`, and `scripts/ingest/upsert_series_search_documents.py` parse registered source datasets and write normalized records/search documents to Postgres. Loader/upsert commands require a reachable Postgres database; embedding generation additionally requires Gemini/Google Cloud environment variables such as `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_ENTERPRISE`.
 * `sql/` holds ordered migration/schema files for the core tables and semantic-search/embedding support. Apply these before running database-backed commands on a fresh database.
 * `docs/` contains the deeper architecture references for the API, CLI, search, browse, chat, and overall system design. Keep README notes high-level and update the docs when changing architecture details. Every design change should reinforce the same constraint: keep the product lightweight and simple.
 
@@ -211,7 +210,7 @@ From the project root:
 
 ```bash
 export ONS_SDMX_DB_DSN="postgresql://ons_sdmx_user:change_me@localhost:5433/ons_sdmx"
-python3 -m scripts.bootstrap_local_db
+python3 -m scripts.db.bootstrap_local_db
 ```
 
 This applies the schema, loads configured datasets, and prints row counts.
@@ -220,7 +219,7 @@ With the local Docker stack running, run local smoke tests with:
 
 ```bash
 docker compose --env-file .env -f infra/local/compose.yaml up -d --build
-python -m scripts.smoke_test_local
+python -m scripts.smoke.smoke_test_local
 ```
 
 ### 4. Static formatting and lint checks

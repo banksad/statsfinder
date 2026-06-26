@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from scripts.dataset_registry import get_dataset_config
+from scripts.common.dataset_registry import get_dataset_config
 
 
 def local_name(tag: str) -> str:

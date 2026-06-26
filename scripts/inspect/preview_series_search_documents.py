@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from scripts.semantic_search_documents import (
+from scripts.search.semantic_search_documents import (
     build_search_document,
     fetch_series_rows,
 )
