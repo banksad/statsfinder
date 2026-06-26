@@ -12,23 +12,28 @@ from app.services.postgres import get_dsn
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = PROJECT_ROOT / "sql" / "001_create_core_tables.sql"
+SCHEMA_DIR = PROJECT_ROOT / "sql"
 DATASETS_CONFIG_PATH = PROJECT_ROOT / "config" / "datasets.json"
 
 
 def apply_schema(dsn: str) -> None:
     """
-    Apply the core SQL schema.
+    Apply all ordered SQL schema files.
 
-    The SQL uses CREATE TABLE IF NOT EXISTS, so this is safe to run repeatedly.
+    The SQL files use idempotent statements such as CREATE TABLE IF NOT EXISTS,
+    so this is safe to run repeatedly.
     """
-    print(f"Applying schema from {SCHEMA_PATH}")
+    schema_paths = sorted(SCHEMA_DIR.glob("*.sql"))
 
-    schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+    if not schema_paths:
+        raise FileNotFoundError(f"No SQL schema files found in {SCHEMA_DIR}")
 
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(schema_sql)
+            for schema_path in schema_paths:
+                print(f"Applying schema from {schema_path}")
+                schema_sql = schema_path.read_text(encoding="utf-8")
+                cur.execute(schema_sql)
 
     print("Schema applied.")
 
