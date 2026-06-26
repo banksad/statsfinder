@@ -808,3 +808,41 @@ It also supports one of Stats Finder’s strongest use cases:
 
 Browse should be implemented as a lightweight discovery tree over official metadata, with clear provenance and direct integration with the export API.
 
+
+## Current implementation
+
+The current Browse implementation is intentionally modest:
+
+```text
+GET /browse
+GET /browse/datasets/{dataset_id}
+GET /v1/datasets
+GET /v1/datasets/{dataset_id}
+GET /v1/datasets/{dataset_id}/series
+```
+
+The Browse landing page leads users to configured datasets. A dataset Browse page
+shows source-backed dataset metadata, a full series table, and optional semantic
+matches within that dataset when a query is supplied. This gives users a useful
+structured path without requiring a complete curated topic tree first.
+
+Current configured datasets are:
+
+```text
+NAG_GBR  UK National Accounts
+CPI_GBR  UK Consumer Price Index
+BOP_GBR  UK Balance of Payments
+SBS_GBR  UK Sectoral Balance Sheet
+GGO_GBR  UK General Government Operations
+```
+
+The future discovery-tree model remains useful, but it should be introduced only
+when it simplifies real browse journeys. Until then, dataset-level browsing is a
+valid lightweight product surface.
+
+## Lightweight browse rule
+
+Browse should not become a dashboard builder or a second metadata system. Keep it
+as a simple route from topic or dataset context to official series, observations,
+and exports. Curated nodes should be small, transparent, and easy to delete or
+replace when better SDMX metadata becomes available.

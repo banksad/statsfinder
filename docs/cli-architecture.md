@@ -712,3 +712,27 @@ Its guiding principle is:
 
 > The CLI is not a second Stats Finder. It is a terminal-shaped doorway into Stats Finder Core.
 
+
+## Current status
+
+There is no packaged CLI in the current repository. The CLI remains a proposed
+thin client over the public API. Existing scripts are development and ingestion
+utilities, not a user-facing `statsfinder` command.
+
+The current API is already sufficient for a minimal future CLI to search, inspect,
+and download single-series CSV files:
+
+```text
+GET /v1/series/search
+GET /v1/series/search/semantic
+GET /v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}
+GET /v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}/observations
+GET /v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}/observations.csv
+```
+
+## Lightweight CLI rule
+
+If a CLI is added, keep it as a very small API wrapper. It should not duplicate
+SDMX parsing, database access, ranking, semantic retrieval, or provenance logic.
+A first version should prefer a few scriptable commands over an interactive TUI or
+large dependency stack.

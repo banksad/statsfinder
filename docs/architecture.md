@@ -673,3 +673,66 @@ The guiding statement is:
 
 > Stats Finder makes official statistics fast to find, easy to inspect, and hard to misinterpret.
 
+
+## Current repository shape
+
+The current implementation remains intentionally small and should stay that way.
+StatsFinder is now organised around a handful of FastAPI route modules, small
+service modules, Jinja templates, plain static assets, SQL migrations, and
+repeatable scripts.
+
+Current product surfaces:
+
+```text
+/search                  server-rendered search page
+/browse                  server-rendered browse landing page
+/browse/datasets/{id}    dataset browse table with optional semantic matches
+/series/{dataset}/{code} server-rendered series page with chart and exports
+/chat                    experimental source-grounded chat page
+/api                     human-readable API landing page
+/v1/...                  JSON and CSV API routes
+```
+
+Current configured datasets:
+
+```text
+NAG_GBR  UK National Accounts
+CPI_GBR  UK Consumer Price Index
+BOP_GBR  UK Balance of Payments
+SBS_GBR  UK Sectoral Balance Sheet
+GGO_GBR  UK General Government Operations
+```
+
+Current optional AI-assisted features are implemented as helpers around the
+source-backed database:
+
+* semantic series search embeds the user query and compares it with stored
+  series metadata embeddings in PostgreSQL/pgvector;
+* chat retrieval combines semantic series matches with ingested SNA reference
+  chunks;
+* chat generation must present short grounded answers and should point users
+  back to source-backed series pages and metadata.
+
+These features must not change the product centre of gravity. StatsFinder should
+remain a lightweight Search, Browse, API, and Export service first. Chat and AI
+retrieval are useful only when they make source-backed discovery simpler.
+
+## Simplicity guardrails
+
+Every architecture change should answer this question first:
+
+> Is this the smallest simple thing that improves source-backed discovery?
+
+Prefer:
+
+* FastAPI routes over extra backend services;
+* Jinja2 pages over a frontend framework;
+* plain CSS and small JavaScript over a bundled frontend toolchain;
+* PostgreSQL full-text search and pgvector over separate search clusters;
+* scripts that can be run locally over complex orchestration;
+* explicit source/provenance fields over generated prose;
+* simple JSON and CSV endpoints over bespoke export systems.
+
+Avoid adding infrastructure, queues, caches, build steps, or frameworks unless a
+measured product need proves that the current lightweight approach is no longer
+enough.

@@ -922,3 +922,76 @@ Its guiding principle is:
 
 > Keep the core API simple, stable, source-backed, and good enough to build other products on top of.
 
+
+## Current implemented API surface
+
+The current repository exposes a deliberately small implemented API. Route
+coverage is asserted at FastAPI startup so accidental route removals are caught
+early.
+
+Implemented health routes:
+
+```text
+GET /health
+GET /health/db
+```
+
+Implemented dataset and search routes:
+
+```text
+GET /v1/datasets
+GET /v1/datasets/{dataset_id}
+GET /v1/datasets/{dataset_id}/series
+GET /v1/series/search
+GET /v1/series/search/semantic
+```
+
+Implemented series and export routes:
+
+```text
+GET /v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}
+GET /v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}/observations
+GET /v1/datasets/{dataset_id}/series/by-indicator/{indicator_code}/observations.csv
+```
+
+Implemented experimental chat routes:
+
+```text
+POST /v1/chat/retrieve
+POST /v1/chat/ask
+```
+
+The browser pages are also intentionally simple:
+
+```text
+GET /
+GET /search
+GET /browse
+GET /browse/datasets/{dataset_id}
+GET /series/{dataset_id}/{indicator_code}
+GET /chat
+GET /api
+```
+
+### Current identity note
+
+The current public series routes use `dataset_id` plus `indicator_code`, with an
+optional `series_id` query parameter when that pair is ambiguous, such as when an
+indicator appears at more than one frequency. The longer-term API direction can
+still move toward `dataset_id` plus `series_key`, but the current implementation
+should not add a second identity style until it clearly improves simplicity for
+users and clients.
+
+### CSV exports
+
+Single-series CSV export is implemented as the first lightweight export surface.
+The CSV repeats key source and series metadata on each row so files remain easy
+to inspect and combine without introducing a heavier export subsystem.
+
+## Lightweight API rule
+
+Keep the API easy to call with `curl`, notebooks, scripts, and the server-rendered
+web UI. New endpoints should return source-backed records, explicit provenance,
+and predictable JSON. Avoid adding authentication, client-specific response
+shapes, or generated statistical claims for public official data unless a clear
+future requirement justifies the complexity.

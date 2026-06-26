@@ -795,3 +795,34 @@ Its strongest design principle is:
 
 > Search helps users find the right official series. It does not become the source of statistical truth.
 
+
+## Current implementation
+
+The current search implementation has two routes:
+
+```text
+GET /v1/series/search
+GET /v1/series/search/semantic
+```
+
+The standard search route performs database-backed metadata search with optional
+dataset filtering. The semantic route embeds the query with the configured Gemini
+embedding model and searches stored series metadata embeddings in PostgreSQL with
+pgvector.
+
+The web Search page remains intentionally lightweight: Jinja2 renders the page,
+plain JavaScript calls the API, and result links resolve to source-backed series
+pages. There is no frontend framework or search-specific infrastructure outside
+PostgreSQL.
+
+Semantic search should remain an enhancement, not a dependency for the whole
+product. If embeddings, Google Cloud configuration, or pgvector data are missing,
+standard dataset pages, series pages, and lexical API search should still be easy
+to reason about.
+
+## Lightweight search rule
+
+Search should stay simple, fast, and explainable. Improve ranking and retrieval
+inside PostgreSQL first. Add aliases, keyword text, embeddings, or small query
+expansions only when they map back to official metadata and make the user journey
+simpler.
