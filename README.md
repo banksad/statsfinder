@@ -18,36 +18,42 @@ The app is intentionally fast, small, and simple in its infrastructure. The ambi
 
 Current features include:
 
-* FastAPI JSON API
+* FastAPI JSON API with versioned `/v1` routes
 * Lightweight server-rendered HTML pages using Jinja2
-* Plain CSS and JavaScript, with no frontend framework
+* Plain CSS and JavaScript, with no frontend framework or Node toolchain
 * Dockerised FastAPI app
 * Docker Compose local Postgres database
-* Dataset search
-* Dataset filtering
-* Series detail pages
-* Source and provenance blocks
+* Search page backed by database metadata search
+* Optional pgvector/Gemini semantic search over series metadata
+* Dataset filtering and dataset-level Browse pages
+* Series detail pages with source/provenance blocks
 * Fast and simple SVG time-series charts
+* JSON and CSV observation endpoints for single-series exports
+* Experimental source-grounded Chat page and retrieval endpoints
 * Repeatable local database bootstrap script
-* Initial support for the following ONS/IMF SDMX datasets:
+* Support for the following configured ONS/IMF SDMX datasets:
 
   * `NAG_GBR` — UK National Accounts
   * `CPI_GBR` — UK Consumer Price Index
+  * `BOP_GBR` — UK Balance of Payments
+  * `SBS_GBR` — UK Sectoral Balance Sheet
+  * `GGO_GBR` — UK General Government Operations
 
 Planned work includes:
 
-* LLM-assisted semantic search over statistical metadata
+* Keeping semantic search and chat as lightweight, source-grounded helpers rather than product centres
 * Better ranking and query interpretation
-* Additional ONS/IMF SDMX datasets
-* Richer SDMX metadata modelling
+* Additional ONS/IMF SDMX datasets where they add clear value
+* Richer SDMX metadata modelling without adding unnecessary infrastructure
 * Cloud deployment on Google Cloud Run
-* Postgres/pgvector-backed semantic search
 
 ## Core principle
 
-The guiding design rule is:
+The guiding design rules are:
 
 > The LLM may help interpret the question. The database must answer it.
+
+> Keep StatsFinder as lightweight and simple as possible. Prefer boring, reviewable components over extra services, frameworks, or clever abstractions.
 
 The application should never invent statistical values. Any AI or semantic layer should help users discover candidate datasets and series, but observations should come from official published data loaded into the database.
 
@@ -97,7 +103,7 @@ Current local architecture:
 Official ONS/IMF SDMX files
   → parsing and enrichment scripts
   → Postgres tables
-  → FastAPI JSON API
+  → FastAPI JSON API and small service modules
   → Jinja2 HTML pages
   → lightweight browser UI
 ```
@@ -111,20 +117,32 @@ app/
 
 templates/
   index.html             Search page
+  browse.html            Browse landing page
+  browse_dataset.html    Dataset Browse page
   series.html            Series detail page
+  api.html               API landing page
+  chat.html              Experimental grounded chat page
 
 static/
   styles.css             Plain CSS
   app.js                 Plain JavaScript search UI
+  series-chart.js        Small SVG chart helper
+  chat.js                Plain JavaScript chat UI
 
 scripts/
   parse_dataset_to_records.py
   enrich_dataset_series.py
   load_dataset_to_postgres.py
   bootstrap_local_db.py
+  upsert_series_search_documents.py
+  embed_series_search_documents.py
+  ingest_sna_reference_chunks.py
 
 sql/
   001_create_core_tables.sql
+  002_create_semantic_search_tables.sql
+  003_create_series_embeddings.sql
+  004_create_reference_chunks.sql
 
 infra/
   local/
@@ -136,11 +154,11 @@ infra/
 
 Quick orientation for contributors:
 
-* `app/api/` is the FastAPI/web layer. It serves JSON endpoints, lightweight HTML pages, and calls into the script modules for data access and search.
+* `app/api/` is the FastAPI/web layer. It serves JSON endpoints, lightweight HTML pages, CSV exports, and experimental chat routes while keeping routing simple.
 * `scripts/query_postgres.py` and related backend modules contain the current database/service logic used by both CLI workflows and the web layer. Commands that query series, run smoke tests, or serve pages need a populated Postgres database and `ONS_SDMX_DB_DSN`.
 * Ingestion scripts such as `scripts/parse_dataset_to_records.py`, `scripts/load_dataset_to_postgres.py`, and `scripts/upsert_series_search_documents.py` parse registered source datasets and write normalized records/search documents to Postgres. Loader/upsert commands require a reachable Postgres database; embedding generation additionally requires Gemini/Google Cloud environment variables such as `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_ENTERPRISE`.
 * `sql/` holds ordered migration/schema files for the core tables and semantic-search/embedding support. Apply these before running database-backed commands on a fresh database.
-* `docs/` contains the deeper architecture references for the API, CLI, search, browse, and overall system design. Keep README notes high-level and update the docs when changing architecture details.
+* `docs/` contains the deeper architecture references for the API, CLI, search, browse, chat, and overall system design. Keep README notes high-level and update the docs when changing architecture details. Every design change should reinforce the same constraint: keep the product lightweight and simple.
 
 ## Local development
 
@@ -319,3 +337,23 @@ should eventually map to candidate official series using metadata, codelists, al
 The semantic layer should not generate observations. It should retrieve and explain official metadata matches.
 
 
+
+Additional endpoint examples:
+
+```bash
+curl -sS "http://127.0.0.1:8000/v1/datasets"
+curl -sS "http://127.0.0.1:8000/v1/series/search?q=inflation&dataset_id=CPI_GBR"
+curl -sS "http://127.0.0.1:8000/v1/series/search/semantic?q=government%20revenue&dataset_id=GGO_GBR"
+curl -sS "http://127.0.0.1:8000/v1/datasets/NAG_GBR/series/by-indicator/NGDP_R_SA_XDC/observations?limit=5"
+curl -sS -o observations.csv "http://127.0.0.1:8000/v1/datasets/CPI_GBR/series/by-indicator/PCPI_IX/observations.csv"
+```
+
+## Lightweight product rule
+
+When updating StatsFinder, choose the smallest useful implementation:
+
+* keep the web UI server-rendered unless a clear need emerges
+* keep browser code plain JavaScript and CSS
+* keep search, browse, exports, and chat grounded in database records
+* avoid new infrastructure unless PostgreSQL, FastAPI, and small scripts are not enough
+* prefer source-backed metadata and simple API responses over generated claims
