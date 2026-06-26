@@ -131,6 +131,17 @@ infra/
     compose.yaml         Local Docker Compose stack
 ```
 
+
+## Repository map
+
+Quick orientation for contributors:
+
+* `app/api/` is the FastAPI/web layer. It serves JSON endpoints, lightweight HTML pages, and calls into the script modules for data access and search.
+* `scripts/query_postgres.py` and related backend modules contain the current database/service logic used by both CLI workflows and the web layer. Commands that query series, run smoke tests, or serve pages need a populated Postgres database and `ONS_SDMX_DB_DSN`.
+* Ingestion scripts such as `scripts/parse_dataset_to_records.py`, `scripts/load_dataset_to_postgres.py`, and `scripts/upsert_series_search_documents.py` parse registered source datasets and write normalized records/search documents to Postgres. Loader/upsert commands require a reachable Postgres database; embedding generation additionally requires Gemini/Google Cloud environment variables such as `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_ENTERPRISE`.
+* `sql/` holds ordered migration/schema files for the core tables and semantic-search/embedding support. Apply these before running database-backed commands on a fresh database.
+* `docs/` contains the deeper architecture references for the API, CLI, search, browse, and overall system design. Keep README notes high-level and update the docs when changing architecture details.
+
 ## Local development
 
 ### 1. Create a local environment file
@@ -181,6 +192,7 @@ With the local Docker stack running, run local smoke tests with:
 ```bash
 docker compose --env-file .env -f infra/local/compose.yaml up -d --build
 python -m scripts.smoke_test_local
+```
 
 ### 4. Open the app
 
