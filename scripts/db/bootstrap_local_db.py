@@ -11,7 +11,7 @@ import psycopg
 from app.services.postgres import get_dsn
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = PROJECT_ROOT / "sql" / "001_create_core_tables.sql"
 DATASETS_CONFIG_PATH = PROJECT_ROOT / "config" / "datasets.json"
 
@@ -56,7 +56,7 @@ def load_dataset(dataset_id: str, dsn: str) -> None:
     env["ONS_SDMX_DB_DSN"] = dsn
 
     subprocess.run(
-        [sys.executable, "-m", "scripts.load_dataset_to_postgres", dataset_id],
+        [sys.executable, "-m", "scripts.ingest.load_dataset_to_postgres", dataset_id],
         cwd=PROJECT_ROOT,
         env=env,
         check=True,

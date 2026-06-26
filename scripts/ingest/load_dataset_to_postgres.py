@@ -9,7 +9,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from scripts.dataset_registry import get_dataset_config
+from scripts.common.dataset_registry import get_dataset_config
 from app.services.postgres import get_dsn
 
 
