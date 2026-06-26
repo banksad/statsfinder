@@ -196,13 +196,30 @@ def format_chart_value(value: float) -> str:
     return f"{value:.2f}"
 
 
+def format_chart_readout_value(value: float) -> str:
+    """
+    Format hover/latest values.
+
+    Keep more precision than axis ticks, but avoid long floating point noise.
+    """
+    if value.is_integer():
+        return f"{int(value):,}"
+
+    return f"{value:,.3f}".rstrip("0").rstrip(".")
+
+
 def build_line_chart_data(
     observations: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """
     Build labelled SVG line chart data from observations.
 
-    Python prepares the coordinates and tick labels.
+    Python prepares:
+    - SVG coordinates
+    - axis ticks
+    - polyline string
+    - per-point data for lightweight JavaScript hover interactions
+
     Jinja only renders the SVG.
     """
     values: list[dict[str, Any]] = []
@@ -228,22 +245,26 @@ def build_line_chart_data(
 
     values = sorted(values, key=lambda row: row["time_period"])
 
-    width = 720
-    height = 320
+    width = 900
+    height = 420
 
-    plot_left = 72
-    plot_right = 24
-    plot_top = 24
-    plot_bottom = 56
+    plot_left = 86
+    plot_right_margin = 32
+    plot_top = 28
+    plot_bottom_margin = 72
 
-    plot_width = width - plot_left - plot_right
-    plot_height = height - plot_top - plot_bottom
+    plot_right = width - plot_right_margin
+    plot_bottom = height - plot_bottom_margin
+
+    plot_width = plot_right - plot_left
+    plot_height = plot_bottom - plot_top
 
     if not values:
         return {
             "has_data": False,
             "width": width,
             "height": height,
+            "point_objects": [],
         }
 
     min_value = min(row["value"] for row in values)
@@ -264,10 +285,24 @@ def build_line_chart_data(
     def y_for_value(value: float) -> float:
         return plot_top + ((max_value - value) / value_range) * plot_height
 
-    points = [
-        f"{x_for_index(index):.2f},{y_for_value(row['value']):.2f}"
-        for index, row in enumerate(values)
-    ]
+    points: list[str] = []
+    point_objects: list[dict[str, Any]] = []
+
+    for index, row in enumerate(values):
+        x = x_for_index(index)
+        y = y_for_value(row["value"])
+
+        points.append(f"{x:.2f},{y:.2f}")
+
+        point_objects.append(
+            {
+                "x": round(x, 2),
+                "y": round(y, 2),
+                "period": row["time_period"],
+                "value": format_chart_readout_value(row["value"]),
+                "raw_value": row["value"],
+            }
+        )
 
     middle_index = len(values) // 2
 
@@ -306,19 +341,23 @@ def build_line_chart_data(
         },
     ]
 
+    latest_row = values[-1]
+
     return {
         "has_data": True,
         "width": width,
         "height": height,
         "plot_left": plot_left,
-        "plot_right": width - plot_right,
+        "plot_right": plot_right,
         "plot_top": plot_top,
-        "plot_bottom": height - plot_bottom,
+        "plot_bottom": plot_bottom,
         "points": " ".join(points),
+        "point_objects": point_objects,
         "x_ticks": x_ticks,
         "y_ticks": y_ticks,
         "first_period": values[0]["time_period"],
-        "latest_period": values[-1]["time_period"],
+        "latest_period": latest_row["time_period"],
+        "latest_value": format_chart_readout_value(latest_row["value"]),
         "min_value": format_chart_value(min_value),
         "max_value": format_chart_value(max_value),
     }

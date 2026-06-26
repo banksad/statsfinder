@@ -117,79 +117,206 @@
       </p>
     </section>
 
-    <section class="card">
-      <h2>Chart</h2>
 
-      {% if chart.has_data %}
-        <div class="chart-container">
-          <svg
-            class="series-chart"
-            viewBox="0 0 {{ chart.width }} {{ chart.height }}"
-            role="img"
-            aria-label="{{ summary.indicator_name }} from {{ chart.first_period }} to {{ chart.latest_period }}"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            <line
-              class="chart-axis"
-              x1="{{ chart.plot_left }}"
-              y1="{{ chart.plot_bottom }}"
-              x2="{{ chart.plot_right }}"
-              y2="{{ chart.plot_bottom }}"
-            />
+	<section class="card series-chart-card">
+	  <div class="chart-panel" id="series-chart-panel">
+	    <div class="chart-panel-header">
+	      <div>
+		<p class="eyebrow">Observations</p>
+		<h2 class="chart-title">
+		  {{ summary.display_name or summary.indicator_name or summary.indicator_code }}
+		</h2>
 
-            <line
-              class="chart-axis"
-              x1="{{ chart.plot_left }}"
-              y1="{{ chart.plot_top }}"
-              x2="{{ chart.plot_left }}"
-              y2="{{ chart.plot_bottom }}"
-            />
+		<p class="chart-subtitle">
+		  {% if summary.frequency_name %}
+		    {{ summary.frequency_name }}
+		  {% endif %}
 
-            {% for tick in chart.y_ticks %}
-              <line
-                class="chart-grid"
-                x1="{{ chart.plot_left }}"
-                y1="{{ tick.y }}"
-                x2="{{ chart.plot_right }}"
-                y2="{{ tick.y }}"
-              />
-              <text
-                class="chart-y-label"
-                x="{{ chart.plot_left - 10 }}"
-                y="{{ tick.y }}"
-                text-anchor="end"
-                dominant-baseline="middle"
-              >
-                {{ tick.label }}
-              </text>
-            {% endfor %}
+		  {% if summary.measure_type %}
+		    · {{ summary.measure_type }}
+		  {% endif %}
 
-            {% for tick in chart.x_ticks %}
-              <text
-                class="chart-x-label"
-                x="{{ tick.x }}"
-                y="{{ chart.plot_bottom + 28 }}"
-                text-anchor="{{ tick.anchor }}"
-              >
-                {{ tick.label }}
-              </text>
-            {% endfor %}
+		  {% if summary.seasonal_adjustment %}
+		    · {{ summary.seasonal_adjustment }}
+		  {% endif %}
 
-            <polyline
-              class="chart-line"
-              points="{{ chart.points }}"
-            />
-          </svg>
-        </div>
+		  {% if summary.unit %}
+		    · {{ summary.unit }}
+		  {% endif %}
 
-        <p class="chart-caption">
-          Chart shows up to 500 observations from {{ chart.first_period }} to {{ chart.latest_period }}.
-          Displayed range: {{ chart.min_value }} to {{ chart.max_value }}.
-        </p>
-      {% else %}
-        <p class="muted">No numeric observations available for charting.</p>
-      {% endif %}
-    </section>
+		  {% if summary.base_period %}
+		    · base period {{ summary.base_period }}
+		  {% endif %}
+		</p>
+	      </div>
+
+	      <div class="chart-actions">
+		<button type="button" class="secondary-button" id="chart-fullscreen-button">
+		  Fullscreen
+		</button>
+
+		<button type="button" class="secondary-button" id="chart-download-svg-button">
+		  Download SVG
+		</button>
+	      </div>
+	    </div>
+
+	    {% if chart.has_data %}
+	      <div class="chart-readout" id="chart-readout">
+		<strong>Latest:</strong>
+		{{ chart.latest_period }} · {{ chart.latest_value if chart.latest_value is defined else chart.max_value }}
+	      </div>
+
+	      <div class="chart-container">
+		<svg
+		  id="series-chart-svg"
+		  class="series-chart"
+		  viewBox="0 0 {{ chart.width }} {{ chart.height }}"
+		  role="img"
+		  aria-labelledby="series-chart-title series-chart-description"
+		  preserveAspectRatio="xMidYMid meet"
+		  data-chart-title="{{ summary.display_name or summary.indicator_name or summary.indicator_code }}"
+		>
+		  <title id="series-chart-title">
+		    {{ summary.display_name or summary.indicator_name or summary.indicator_code }}
+		  </title>
+
+		  <desc id="series-chart-description">
+		    Chart showing observations from {{ chart.first_period }} to {{ chart.latest_period }}.
+		  </desc>
+
+		  <line
+		    class="chart-axis"
+		    x1="{{ chart.plot_left }}"
+		    y1="{{ chart.plot_bottom }}"
+		    x2="{{ chart.plot_right }}"
+		    y2="{{ chart.plot_bottom }}"
+		  />
+
+		  <line
+		    class="chart-axis"
+		    x1="{{ chart.plot_left }}"
+		    y1="{{ chart.plot_top }}"
+		    x2="{{ chart.plot_left }}"
+		    y2="{{ chart.plot_bottom }}"
+		  />
+
+		  {% for tick in chart.y_ticks %}
+		    <line
+		      class="chart-grid"
+		      x1="{{ chart.plot_left }}"
+		      y1="{{ tick.y }}"
+		      x2="{{ chart.plot_right }}"
+		      y2="{{ tick.y }}"
+		    />
+		    <text
+		      class="chart-y-label"
+		      x="{{ chart.plot_left - 10 }}"
+		      y="{{ tick.y }}"
+		      text-anchor="end"
+		      dominant-baseline="middle"
+		    >
+		      {{ tick.label }}
+		    </text>
+		  {% endfor %}
+
+		  {% for tick in chart.x_ticks %}
+		    <text
+		      class="chart-x-label"
+		      x="{{ tick.x }}"
+		      y="{{ chart.plot_bottom + 28 }}"
+		      text-anchor="{{ tick.anchor }}"
+		    >
+		      {{ tick.label }}
+		    </text>
+		  {% endfor %}
+
+		  <text
+		    class="chart-axis-title chart-y-axis-title"
+		    x="20"
+		    y="{{ (chart.plot_top + chart.plot_bottom) / 2 }}"
+		    text-anchor="middle"
+		    transform="rotate(-90 20 {{ (chart.plot_top + chart.plot_bottom) / 2 }})"
+		  >
+		    {% if summary.unit %}
+		      {{ summary.unit }}
+		    {% else %}
+		      Value
+		    {% endif %}
+		  </text>
+
+		  <text
+		    class="chart-axis-title chart-x-axis-title"
+		    x="{{ (chart.plot_left + chart.plot_right) / 2 }}"
+		    y="{{ chart.height - 8 }}"
+		    text-anchor="middle"
+		  >
+		    Period
+		  </text>
+
+		  <polyline
+		    class="chart-line"
+		    points="{{ chart.points }}"
+		  />
+
+		  <line
+		    id="chart-hover-line"
+		    class="chart-hover-line"
+		    x1="0"
+		    y1="{{ chart.plot_top }}"
+		    x2="0"
+		    y2="{{ chart.plot_bottom }}"
+		    hidden
+		  />
+
+		  <circle
+		    id="chart-hover-point"
+		    class="chart-hover-point"
+		    cx="0"
+		    cy="0"
+		    r="4"
+		    hidden
+		  />
+
+		  {% for point in chart.point_objects %}
+		    <circle
+		      class="chart-hit-target"
+		      cx="{{ point.x }}"
+		      cy="{{ point.y }}"
+		      r="10"
+		      data-period="{{ point.period }}"
+		      data-value="{{ point.value }}"
+		      data-x="{{ point.x }}"
+		      data-y="{{ point.y }}"
+		    />
+		  {% endfor %}
+		</svg>
+	      </div>
+
+	      <div class="chart-footer">
+		<p class="chart-caption">
+		  Chart shows up to 500 observations from {{ chart.first_period }} to {{ chart.latest_period }}.
+		  Displayed range: {{ chart.min_value }} to {{ chart.max_value }}.
+		</p>
+
+		<p class="chart-source">
+		  Source:
+		  {% if summary.source_url %}
+		    <a href="{{ summary.source_url }}" target="_blank" rel="noopener noreferrer">
+		      {{ summary.dataset_title or summary.dataset_id }}
+		    </a>
+		  {% else %}
+		    {{ summary.dataset_title or summary.dataset_id }}
+		  {% endif %}
+		  via StatsFinder.
+		</p>
+	      </div>
+	    {% else %}
+	      <p class="muted">No numeric observations available for charting.</p>
+	    {% endif %}
+	  </div>
+	</section>
+
 
     <section class="card">
       <h2>First 20 observations</h2>
