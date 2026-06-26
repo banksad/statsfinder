@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Chat — StatsFinder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  {% set active_nav = "chat" %}
+  {% include "_nav.html" %}
+
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Experimental</p>
+      <h1>Chat with source-backed statistics</h1>
+      <p>
+        Ask a question. StatsFinder retrieves source-backed statistical series and
+        reference passages, then asks Gemini to write a short grounded answer and
+        select the most relevant series.
+      </p>
+    </section>
+
+    <section class="card">
+      <form id="chat-form" class="chat-form">
+        <label for="chat-question">Question</label>
+
+        <textarea
+          id="chat-question"
+          rows="4"
+          placeholder="What is the difference between government revenue and net lending?"
+        ></textarea>
+
+        <label for="chat-dataset">Dataset scope</label>
+
+        <select id="chat-dataset">
+          <option value="GGO_GBR" selected>UK General Government Operations</option>
+          <option value="">All datasets</option>
+          {% for dataset in datasets %}
+            {% if dataset.dataset_id != "GGO_GBR" %}
+              <option value="{{ dataset.dataset_id }}">
+                {{ dataset.dataset_title or dataset.dataset_id }}
+              </option>
+            {% endif %}
+          {% endfor %}
+        </select>
+
+        <div class="chat-actions">
+          <button type="submit" id="chat-submit-button">Ask</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Answer</h2>
+      <div id="chat-answer" class="chat-answer muted">
+        Ask a question to begin.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Suggested data series</h2>
+      <div id="chat-selected-series" class="chat-selected-series muted">
+        Gemini-selected, source-backed data series will appear here.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Reference passages</h2>
+      <div id="chat-references" class="chat-references muted">
+        Relevant reference passages will appear here.
+      </div>
+    </section>
+
+    <details class="card chat-debug-panel">
+      <summary>Grounding and candidate matches</summary>
+      <div id="chat-debug" class="chat-debug muted">
+        Retrieval queries, candidate SDMX series and candidate reference passages
+        will appear here after asking a question.
+      </div>
+    </details>
+  </main>
+
+  <script src="/static/chat.js"></script>
+</body>
+</html>

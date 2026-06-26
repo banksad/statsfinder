@@ -13,6 +13,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from pydantic import BaseModel
+
 from scripts.query_postgres import (
     build_observations_by_indicator_response,
     build_search_response,
@@ -24,11 +26,14 @@ from scripts.query_postgres import (
     list_series_for_dataset,
     search_series,
 )
+
 from scripts.semantic_search_backend import (
     DEFAULT_SEMANTIC_DIMENSION,
     DEFAULT_SEMANTIC_MODEL,
     semantic_search_series,
 )
+
+from scripts.chat_backend import ask_chat, build_chat_retrieval_bundle
 
 
 BASE_DIR = FilePath(__file__).resolve().parents[2]
@@ -47,6 +52,11 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+class ChatRequest(BaseModel):
+    question: str
+    dataset_id: str | None = None
 
 
 def safe_filename_component(value: str) -> str:
@@ -918,3 +928,76 @@ def get_series_observations_by_indicator_csv_endpoint(
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+
+
+@app.get("/chat", response_class=HTMLResponse)
+def chat_page(request: Request) -> HTMLResponse:
+    """
+    Experimental source-grounded chat page.
+    """
+    datasets = list_datasets()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="chat.html",
+        context={
+            "datasets": datasets,
+            "active_nav": "chat",
+        },
+    )
+
+
+@app.post("/v1/chat/retrieve")
+def chat_retrieve_endpoint(
+    request_body: ChatRequest,
+) -> dict[str, Any]:
+    """
+    Retrieve SDMX series and reference chunks for a chat question.
+
+    This endpoint is useful for debugging the grounding before generation.
+    """
+    question = request_body.question.strip()
+
+    if not question:
+        raise HTTPException(
+            status_code=400,
+            detail="Question must not be empty.",
+        )
+
+    try:
+        return build_chat_retrieval_bundle(
+            question=question,
+            dataset_id=request_body.dataset_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Chat retrieval is not available: {exc}",
+        ) from exc
+
+
+@app.post("/v1/chat/ask")
+def chat_ask_endpoint(
+    request_body: ChatRequest,
+) -> dict[str, Any]:
+    """
+    Retrieve source-backed context and generate a short grounded answer.
+    """
+    question = request_body.question.strip()
+
+    if not question:
+        raise HTTPException(
+            status_code=400,
+            detail="Question must not be empty.",
+        )
+
+    try:
+        return ask_chat(
+            question=question,
+            dataset_id=request_body.dataset_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Chat is not available: {exc}",
+        ) from exc
