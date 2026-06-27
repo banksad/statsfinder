@@ -84,6 +84,14 @@ def build_retrieval_queries(question: str) -> list[str]:
     if "revenue" in lower_question:
         queries.append("general government revenue taxes")
 
+    if (
+        "government debt" in lower_question
+        or "general government debt" in lower_question
+    ):
+        queries.append("general government debt at nominal value")
+        queries.append("general government gross debt liabilities stock")
+        queries.append("general government debt by currency residual maturity")
+
     deduped: list[str] = []
 
     for query in queries:
@@ -99,10 +107,12 @@ def retrieve_sdmx_series(
     question: str,
     dataset_id: str | None = None,
     limit_per_query: int = 5,
-    max_results: int = 8,
+    max_results: int = 12,
+    protected_per_query: int = 2,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     retrieval_queries = build_retrieval_queries(question)
     by_series_id: dict[int, dict[str, Any]] = {}
+    per_query_results: list[list[dict[str, Any]]] = []
 
     for retrieval_query in retrieval_queries:
         rows = semantic_search_series(
@@ -114,6 +124,8 @@ def retrieve_sdmx_series(
             min_similarity=0.0,
             include_debug=False,
         )
+
+        per_query_rows: list[dict[str, Any]] = []
 
         for row in rows:
             series_id = row.get("series_id")
@@ -136,9 +148,23 @@ def retrieve_sdmx_series(
                 if new_score > existing_score:
                     by_series_id[series_id]["similarity_score"] = new_score
 
-    results = list(by_series_id.values())
+            per_query_rows.append(by_series_id[series_id])
 
-    results.sort(
+        per_query_results.append(per_query_rows)
+
+    protected: list[dict[str, Any]] = []
+
+    for rows in per_query_results:
+        for row in rows[:protected_per_query]:
+            if row not in protected:
+                protected.append(row)
+
+            if len(protected) >= max_results:
+                return protected[:max_results], retrieval_queries
+
+    ranked = list(by_series_id.values())
+
+    ranked.sort(
         key=lambda row: (
             row.get("similarity_score") or 0,
             row.get("observation_count") or 0,
@@ -146,7 +172,18 @@ def retrieve_sdmx_series(
         reverse=True,
     )
 
+    results = protected[:]
+
+    for row in ranked:
+        if row not in results:
+            results.append(row)
+
+        if len(results) >= max_results:
+            break
+
     return results[:max_results], retrieval_queries
+
+
 
 
 def retrieve_reference_passages(
@@ -224,7 +261,7 @@ def build_generation_prompt(bundle: dict[str, Any]) -> str:
 
     candidate_series = [
         candidate_series_for_prompt(row)
-        for row in bundle.get("series_matches", [])[:10]
+        for row in bundle.get("series_matches", [])[:12]
     ]
 
     candidate_references = [

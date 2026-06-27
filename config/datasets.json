@@ -68,5 +68,19 @@
   "series_raw_json_path": "data/processed/ggo_series_records.json",
   "series_json_path": "data/processed/ggo_series_enriched.json",
   "observations_json_path": "data/processed/ggo_observation_records.json"
+},
+{
+  "dataset_id": "GGD_GBR",
+  "title": "UK General Government Debt",
+  "data_domain_code": "GGD",
+  "data_domain_label": "General Government Debt",
+  "source_url": "https://static.ons.gov.uk/imf/GGD_GBR.xml",
+  "documentation_url": "https://www.ons.gov.uk/aboutus/imfpage",
+  "metadata_url": "https://dsbb.imf.org/sdds/dqaf-base/country/GBR/category/GGD00",
+  "structure_ref": "IMF_ECOFIN_DSD_1_0",
+  "raw_file_path": "data/raw/GGD_GBR.xml",
+  "series_raw_json_path": "data/processed/ggd_series_records.json",
+  "series_json_path": "data/processed/ggd_series_enriched.json",
+  "observations_json_path": "data/processed/ggd_observation_records.json"
 }
 ]

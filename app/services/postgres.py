@@ -49,9 +49,9 @@ def get_connection() -> psycopg.Connection:
 
 def get_database_health() -> dict[str, int]:
     queries = {
-        "datasets": "SELECT COUNT(*) FROM datasets",
-        "series": "SELECT COUNT(*) FROM series",
-        "observations": "SELECT COUNT(*) FROM observations",
+        "datasets": "SELECT COUNT(*) AS count FROM datasets",
+        "series": "SELECT COUNT(*) AS count FROM series",
+        "observations": "SELECT COUNT(*) AS count FROM observations",
     }
 
     counts: dict[str, int] = {}
@@ -60,7 +60,12 @@ def get_database_health() -> dict[str, int]:
         with conn.cursor() as cur:
             for label, query in queries.items():
                 cur.execute(query)
-                counts[label] = cur.fetchone()[0]
+                row = cur.fetchone()
+
+                if row is None:
+                    raise RuntimeError(f"Database health query returned no row for {label}")
+
+                counts[label] = int(row["count"])
 
     return counts
 

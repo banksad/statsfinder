@@ -28,7 +28,11 @@ CONTROLLED_ABBREVIATIONS = {
     "consumer price index": "CPI",
     "consumer price indices": "CPI",
     "balance of payments": "BOP",
+    "general government operations": "GGO",
+    "general government debt": "GGD",
+    "special drawing rights": "SDR",
 }
+
 
 GGO_LABEL_DROP_PARTS = {
     "government and public sector finance",
@@ -36,6 +40,79 @@ GGO_LABEL_DROP_PARTS = {
     "2014 manual",
     "national currency",
 }
+
+
+GGD_LABEL_DROP_PARTS = {
+    "government and public sector finance",
+    "stocks in assets and liabilities",
+    "fiscal",
+    "assets and liabilities",
+    "classification of the stocks of assets and liabilities",
+    "2001 manual",
+    "national currency",
+}
+
+
+def clean_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def normalise_ggd_label_part(part: str) -> str:
+    """
+    Normalise GGD label fragments without inventing new concepts.
+
+    The official labels are useful but verbose. We keep source-backed wording,
+    while removing typography/noise that hurts display and semantic matching.
+    """
+    part = clean_whitespace(part)
+    part = part.replace("Debt  by", "Debt by")
+    part = part.replace("Debt (at Nominal Value)", "Debt at Nominal Value")
+    part = part.replace("Domestic Debt (at Nominal Value)", "Domestic Debt at Nominal Value")
+    part = part.replace("Foreign Debt (at Nominal Value)", "Foreign Debt at Nominal Value")
+    return clean_whitespace(part)
+
+
+def dedupe_preserve_order(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+
+    for value in values:
+        cleaned = clean_whitespace(value)
+        key = cleaned.lower()
+
+        if key and key not in seen:
+            deduped.append(cleaned)
+            seen.add(key)
+
+    return deduped
+
+
+def order_general_government_first(parts: list[str]) -> list[str]:
+    """
+    Put General Government first when it exists in the official label.
+
+    This gives stable user-facing labels such as:
+      General Government, Liabilities, Loans
+    rather than:
+      Liabilities, General Government, Loans
+    """
+    has_general_government = any(
+        clean_whitespace(part).lower() == "general government"
+        for part in parts
+    )
+
+    ordered_parts: list[str] = []
+
+    if has_general_government:
+        ordered_parts.append("General Government")
+
+    for part in parts:
+        if clean_whitespace(part).lower() == "general government":
+            continue
+
+        ordered_parts.append(part)
+
+    return dedupe_preserve_order(ordered_parts)
 
 
 def split_ggo_indicator_label(indicator_name: str) -> list[str]:
@@ -95,23 +172,7 @@ def build_ggo_primary_text(indicator_name: str) -> str | None:
         if clean_whitespace(part).lower() not in GGO_LABEL_DROP_PARTS
     ]
 
-    has_general_government = any(
-        clean_whitespace(part).lower() == "general government"
-        for part in cleaned_parts
-    )
-
-    ordered_parts: list[str] = []
-
-    if has_general_government:
-        ordered_parts.append("General Government")
-
-    for part in cleaned_parts:
-        if clean_whitespace(part).lower() == "general government":
-            continue
-
-        ordered_parts.append(part)
-
-    ordered_parts = dedupe_preserve_order(ordered_parts)
+    ordered_parts = order_general_government_first(cleaned_parts)
 
     if not ordered_parts:
         return None
@@ -119,8 +180,52 @@ def build_ggo_primary_text(indicator_name: str) -> str | None:
     return ", ".join(ordered_parts)
 
 
-def clean_whitespace(value: str) -> str:
-    return re.sub(r"\s+", " ", value).strip()
+def split_ggd_indicator_label(indicator_name: str) -> list[str]:
+    """
+    Split a GGD official SDMX indicator label into source-backed hierarchy parts.
+
+    GGD labels are generally comma-separated, but include bracketed methodology
+    and occasional spacing noise such as "Debt  by Currency". We normalise those
+    without interpreting the compact indicator code.
+    """
+    label = clean_whitespace(indicator_name)
+
+    # Convert bracketed methodology into a comma-separated part.
+    label = re.sub(r"\s*\[([^\]]+)\]", r", \1", label)
+
+    raw_parts = [
+        normalise_ggd_label_part(part)
+        for part in label.split(",")
+        if clean_whitespace(part)
+    ]
+
+    return dedupe_preserve_order(raw_parts)
+
+
+def build_ggd_primary_text(indicator_name: str) -> str | None:
+    """
+    Build a source-backed, human-friendly GGD series name from the official
+    SDMX indicator label.
+
+    Examples:
+      General Government, Debt at Nominal Value
+      General Government, Liabilities, Loans
+      General Government, Debt by Currency, Debt denominated in domestic currency
+    """
+    parts = split_ggd_indicator_label(indicator_name)
+
+    cleaned_parts = [
+        part
+        for part in parts
+        if clean_whitespace(part).lower() not in GGD_LABEL_DROP_PARTS
+    ]
+
+    ordered_parts = order_general_government_first(cleaned_parts)
+
+    if not ordered_parts:
+        return None
+
+    return ", ".join(ordered_parts)
 
 
 def split_indicator_name(indicator_name: str | None) -> list[str]:
@@ -206,20 +311,6 @@ def controlled_abbreviations_for_text(text: str) -> list[str]:
             abbreviations.append(abbreviation)
 
     return abbreviations
-
-
-def dedupe_preserve_order(values: list[str]) -> list[str]:
-    deduped: list[str] = []
-    seen: set[str] = set()
-
-    for value in values:
-        key = value.lower()
-
-        if key and key not in seen:
-            deduped.append(value)
-            seen.add(key)
-
-    return deduped
 
 
 def build_keyword_text(
@@ -337,6 +428,61 @@ def build_content_hash(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def apply_dataset_specific_label_cleanup(
+    dataset_id: str,
+    indicator_name: str,
+    parsed_metadata: dict[str, Any],
+) -> tuple[str | None, list[str] | None, dict[str, Any]]:
+    """
+    Return dataset-specific primary text and hierarchy when a dataset needs
+    official-label cleanup.
+
+    This keeps generic datasets generic while allowing known verbose IMF/SDMX
+    labels to be made usable for search, browse, and Chat.
+    """
+    if dataset_id == "GGO_GBR":
+        ggo_parts = split_ggo_indicator_label(indicator_name)
+        ggo_primary_text = build_ggo_primary_text(indicator_name)
+
+        if not ggo_primary_text:
+            return None, None, parsed_metadata
+
+        ggo_hierarchy_raw = [
+            part
+            for part in ggo_parts
+            if clean_whitespace(part).lower() not in GGO_LABEL_DROP_PARTS
+        ]
+        ggo_hierarchy = order_general_government_first(ggo_hierarchy_raw)
+
+        parsed_metadata["parsed_topic"] = ggo_primary_text
+        parsed_metadata["hierarchy"] = ggo_hierarchy
+        parsed_metadata["ggo_label_parts"] = ggo_parts
+
+        return ggo_primary_text, ggo_hierarchy, parsed_metadata
+
+    if dataset_id == "GGD_GBR":
+        ggd_parts = split_ggd_indicator_label(indicator_name)
+        ggd_primary_text = build_ggd_primary_text(indicator_name)
+
+        if not ggd_primary_text:
+            return None, None, parsed_metadata
+
+        ggd_hierarchy_raw = [
+            part
+            for part in ggd_parts
+            if clean_whitespace(part).lower() not in GGD_LABEL_DROP_PARTS
+        ]
+        ggd_hierarchy = order_general_government_first(ggd_hierarchy_raw)
+
+        parsed_metadata["parsed_topic"] = ggd_primary_text
+        parsed_metadata["hierarchy"] = ggd_hierarchy
+        parsed_metadata["ggd_label_parts"] = ggd_parts
+
+        return ggd_primary_text, ggd_hierarchy, parsed_metadata
+
+    return None, None, parsed_metadata
+
+
 def build_search_document(row: dict[str, Any]) -> dict[str, Any]:
     dataset_id = row.get("dataset_id", "")
     indicator_name = row.get("indicator_name")
@@ -366,43 +512,21 @@ def build_search_document(row: dict[str, Any]) -> dict[str, Any]:
         "unit_multiplier": unit_multiplier,
     }
 
-    if dataset_id == "GGO_GBR" and indicator_name:
-        ggo_parts = split_ggo_indicator_label(indicator_name)
-        ggo_primary_text = build_ggo_primary_text(indicator_name)
-
-        if ggo_primary_text:
-            primary_text = ggo_primary_text
-
-            ggo_hierarchy_raw = [
-                part
-                for part in ggo_parts
-                if clean_whitespace(part).lower() not in GGO_LABEL_DROP_PARTS
-            ]
-
-            has_general_government = any(
-                clean_whitespace(part).lower() == "general government"
-                for part in ggo_hierarchy_raw
+    if indicator_name:
+        cleaned_primary_text, cleaned_hierarchy, parsed_metadata = (
+            apply_dataset_specific_label_cleanup(
+                dataset_id=dataset_id,
+                indicator_name=indicator_name,
+                parsed_metadata=parsed_metadata,
             )
+        )
 
-            ggo_hierarchy: list[str] = []
+        if cleaned_primary_text:
+            primary_text = cleaned_primary_text
+            topic = cleaned_primary_text
 
-            if has_general_government:
-                ggo_hierarchy.append("General Government")
-
-            for part in ggo_hierarchy_raw:
-                if clean_whitespace(part).lower() == "general government":
-                    continue
-
-                ggo_hierarchy.append(part)
-
-            ggo_hierarchy = dedupe_preserve_order(ggo_hierarchy)
-
-            topic = ggo_primary_text
-            hierarchy = ggo_hierarchy
-
-            parsed_metadata["parsed_topic"] = ggo_primary_text
-            parsed_metadata["hierarchy"] = ggo_hierarchy
-            parsed_metadata["ggo_label_parts"] = ggo_parts
+        if cleaned_hierarchy is not None:
+            hierarchy = cleaned_hierarchy
 
     embedding_text = build_embedding_text(
         row=row,
