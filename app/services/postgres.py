@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from urllib.parse import quote
 from typing import Any
 
 import psycopg
@@ -23,18 +24,49 @@ def get_dsn() -> str:
     """
     Return the database connection string from the environment.
 
-    All database entry points use the same configuration contract: callers must
-    set ONS_SDMX_DB_DSN explicitly rather than relying on an implicit fallback.
+    Local Docker Compose sets ONS_SDMX_DB_DSN directly. Cloud Run can do the
+    same, or it can provide CLOUD_SQL_INSTANCE_CONNECTION_NAME plus database
+    credentials so we connect through the Cloud SQL Unix socket mounted at
+    /cloudsql/<INSTANCE_CONNECTION_NAME>.
     """
     dsn = os.environ.get("ONS_SDMX_DB_DSN")
 
-    if not dsn:
-        raise RuntimeError(
-            "ONS_SDMX_DB_DSN is not set. "
-            "Create a local .env file or export the variable before connecting to Postgres."
+    if dsn:
+        return dsn
+
+    cloud_sql_instance = os.environ.get("CLOUD_SQL_INSTANCE_CONNECTION_NAME")
+
+    if cloud_sql_instance:
+        database = os.environ.get("DB_NAME") or os.environ.get("POSTGRES_DB")
+        user = os.environ.get("DB_USER") or os.environ.get("POSTGRES_USER")
+        password = os.environ.get("DB_PASSWORD") or os.environ.get("POSTGRES_PASSWORD")
+
+        missing = [
+            name
+            for name, value in {
+                "DB_NAME or POSTGRES_DB": database,
+                "DB_USER or POSTGRES_USER": user,
+                "DB_PASSWORD or POSTGRES_PASSWORD": password,
+            }.items()
+            if not value
+        ]
+
+        if missing:
+            raise RuntimeError(
+                "Cloud SQL database configuration is incomplete. Missing: "
+                + ", ".join(missing)
+            )
+
+        return (
+            f"postgresql://{quote(user)}:{quote(password)}@/{quote(database)}"
+            f"?host=/cloudsql/{quote(cloud_sql_instance, safe=':')}"
         )
 
-    return dsn
+    raise RuntimeError(
+        "Database configuration is not set. Set ONS_SDMX_DB_DSN, or set "
+        "CLOUD_SQL_INSTANCE_CONNECTION_NAME with DB_NAME, DB_USER, and DB_PASSWORD "
+        "before connecting to Postgres."
+    )
 
 
 def get_connection() -> psycopg.Connection:

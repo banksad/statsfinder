@@ -100,6 +100,15 @@ def test_database_health(base_url: str) -> None:
     require("status" in data, "database health: expected a status field")
 
 
+def test_search_page(base_url: str) -> None:
+    result = fetch(base_url, "/search")
+    require_status(result, 200, "search page")
+    require(
+        "text/html" in result.content_type,
+        f"search page: expected HTML content type, got {result.content_type}",
+    )
+
+
 def test_datasets(base_url: str) -> None:
     result = fetch(base_url, "/v1/datasets")
     require_status(result, 200, "list datasets")
@@ -203,6 +212,7 @@ def run_smoke_tests(base_url: str) -> None:
     tests = [
         ("health", test_health),
         ("database health", test_database_health),
+        ("search page", test_search_page),
         ("list datasets", test_datasets),
         ("single dataset", test_single_dataset),
         ("dataset series", test_dataset_series),
