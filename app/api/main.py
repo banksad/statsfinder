@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api import chat_routes, v1_routes, web_routes
+from app.middleware.cloudflare_access import CloudflareAccessMiddleware
 
 BASE_DIR = FilePath(__file__).resolve().parents[2]
 STATIC_DIR = BASE_DIR / "static"
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
+    app.add_middleware(CloudflareAccessMiddleware)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(web_routes.router)
     app.include_router(v1_routes.router)
