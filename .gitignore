@@ -9,6 +9,7 @@ __pycache__/
 !.env.example
 
 # Local data files generated or downloaded by scripts
+data/
 data/raw/
 data/structure/
 data/processed/
