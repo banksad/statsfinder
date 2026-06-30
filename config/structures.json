@@ -1,0 +1,9 @@
+[
+  {
+    "structure_ref": "IMF_ECOFIN_DSD_1_0",
+    "title": "IMF ECOFIN Data Structure Definition 1.0",
+    "source_url": "https://sdmxcentral.imf.org/sdmx/v2/structure/datastructure/IMF/ECOFIN_DSD/1.0?references=all&detail=full",
+    "raw_file_path": "data/structure/ECOFIN_DSD.full.xml",
+    "codelist_lookup_path": "data/processed/ecofin_codelist_lookup.json"
+  }
+]

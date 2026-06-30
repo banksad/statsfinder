@@ -2,9 +2,10 @@ from pathlib import Path
 import json
 import xml.etree.ElementTree as ET
 
+from scripts.common.structure_registry import get_structure_config
 
-DSD_PATH = Path("data/structure/ECOFIN_DSD.full.xml")
-OUTPUT_PATH = Path("data/processed/ecofin_codelist_lookup.json")
+
+DEFAULT_STRUCTURE_REF = "IMF_ECOFIN_DSD_1_0"
 
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
@@ -108,29 +109,52 @@ def parse_codelists(dsd_path: Path) -> dict:
     return lookup
 
 
-def main() -> None:
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+def build_codelist_lookup(dsd_path: Path, output_path: Path) -> dict:
+    """
+    Parse the DSD codelists and write the lookup JSON, returning the lookup.
 
-    lookup = parse_codelists(DSD_PATH)
+    This is the reusable entry point used by the ingest pipeline. ``main`` wraps
+    it with the structure registry and some illustrative prints.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with OUTPUT_PATH.open("w", encoding="utf-8") as file:
+    lookup = parse_codelists(dsd_path)
+
+    with output_path.open("w", encoding="utf-8") as file:
         json.dump(lookup, file, indent=2, ensure_ascii=False)
+
+    return lookup
+
+
+def _print_example(lookup: dict, codelist_id: str, code: str) -> None:
+    """
+    Print one example lookup, tolerating codes that are not present.
+    """
+    item = lookup.get(codelist_id, {}).get("codes", {}).get(code)
+    print(f"\n{codelist_id} / {code}")
+
+    if item is None:
+        print("  (not present in this DSD)")
+        return
+
+    print(f"  Name: {item['name']}")
+    print(f"  Description: {item['description']}")
+
+
+def main() -> None:
+    structure = get_structure_config(DEFAULT_STRUCTURE_REF)
+    dsd_path = Path(structure["raw_file_path"])
+    output_path = Path(structure["codelist_lookup_path"])
+
+    lookup = build_codelist_lookup(dsd_path, output_path)
 
     print("Parsed codelists successfully.")
     print(f"Number of codelists: {len(lookup)}")
-    print(f"Wrote lookup to: {OUTPUT_PATH}")
+    print(f"Wrote lookup to: {output_path}")
 
     print("\nExample lookups:")
-
-    indicator = lookup["CL_INDICATOR"]["codes"]["NGDP_SA_XDC"]
-    print("\nCL_INDICATOR / NGDP_SA_XDC")
-    print(f"  Name: {indicator['name']}")
-    print(f"  Description: {indicator['description']}")
-
-    freq = lookup["CL_FREQ"]["codes"]["Q"]
-    print("\nCL_FREQ / Q")
-    print(f"  Name: {freq['name']}")
-    print(f"  Description: {freq['description']}")
+    _print_example(lookup, "CL_INDICATOR", "NGDP_SA_XDC")
+    _print_example(lookup, "CL_FREQ", "Q")
 
 
 if __name__ == "__main__":

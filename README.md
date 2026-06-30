@@ -204,16 +204,23 @@ Or run detached:
 docker compose --env-file .env -f infra/local/compose.yaml up -d --build
 ```
 
-### 3. Bootstrap the database
+### 3. Load data
 
-From the project root:
+From the project root, fetch the official sources and load everything with one
+idempotent command:
 
 ```bash
 export ONS_SDMX_DB_DSN="postgresql://ons_sdmx_user:change_me@localhost:5433/ons_sdmx"
-python3 -m scripts.db.bootstrap_local_db
+python3 -m scripts.ingest.refresh_all
 ```
 
-This applies the schema, loads configured datasets, and prints row counts.
+This applies the schema, downloads each registered SDMX source and the IMF
+codelist structure, then parses, enriches, and upserts every dataset, printing a
+per-dataset summary. It is safe to re-run; pass `--only CPI_GBR,NAG_GBR` to
+refresh a subset, or `--skip-fetch` to reuse source files already on disk.
+
+If the processed JSON is already present, `python3 -m scripts.db.bootstrap_local_db`
+applies the schema and loads it without re-downloading.
 
 With the local Docker stack running, run local smoke tests with:
 

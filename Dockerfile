@@ -13,6 +13,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 COPY app ./app
 COPY scripts ./scripts
 COPY config ./config
+COPY sql ./sql
 COPY static ./static
 COPY templates ./templates
 
