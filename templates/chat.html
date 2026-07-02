@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Chat — StatsFinder</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=6">
 </head>
 <body>
   {% set active_nav = "chat" %}
@@ -34,14 +34,11 @@
         <label for="chat-dataset">Dataset scope</label>
 
         <select id="chat-dataset">
-          <option value="GGO_GBR" selected>UK General Government Operations</option>
-          <option value="">All datasets</option>
+          <option value="" selected>All datasets</option>
           {% for dataset in datasets %}
-            {% if dataset.dataset_id != "GGO_GBR" %}
-              <option value="{{ dataset.dataset_id }}">
-                {{ dataset.dataset_title or dataset.dataset_id }}
-              </option>
-            {% endif %}
+            <option value="{{ dataset.dataset_id }}">
+              {{ dataset.dataset_title or dataset.dataset_id }}
+            </option>
           {% endfor %}
         </select>
 
@@ -82,6 +79,6 @@
   </main>
 
   <script src="/static/utils.js?v=1"></script>
-  <script src="/static/chat.js"></script>
+  <script src="/static/chat.js?v=2"></script>
 </body>
 </html>

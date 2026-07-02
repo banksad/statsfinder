@@ -244,18 +244,18 @@ async function loadDatasetSummary() {
   }
 
   datasetSummaryDiv.innerHTML = `
-    <section class="dataset-panel">
-      <div class="dataset-panel-header">
-        <h2>Available datasets</h2>
-        <p class="muted">
+    <details class="dataset-panel dataset-panel-collapsible">
+      <summary>
+        Available datasets
+        <span class="muted">
           ${escapeHtml(data.datasets.length)} datasets loaded from source-backed SDMX metadata.
-        </p>
-      </div>
+        </span>
+      </summary>
 
       <div class="dataset-grid">
         ${data.datasets.map(renderDatasetCard).join("")}
       </div>
-    </section>
+    </details>
   `;
 }
 
@@ -264,7 +264,7 @@ async function runSearch(query, options = {}) {
   const updateUrl = options.updateUrl ?? true;
   const trimmedQuery = query.trim();
   const selectedDatasetId = datasetSelect.value;
-  const selectedMode = searchModeSelect ? searchModeSelect.value : "keyword";
+  const selectedMode = searchModeSelect ? searchModeSelect.value : "semantic";
 
   if (updateUrl) {
     updateSearchUrl(trimmedQuery, selectedDatasetId, selectedMode);

@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <title>StatsFinder</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/styles.css?v=6">
 
 </head>
 <body>
@@ -11,52 +12,55 @@
   {% set active_nav = active_nav | default("search") %}
   {% include "_nav.html" %}
 
-  <h1>StatsFinder</h1>
-
-  <p>
-    Search public ONS/IMF SDMX series metadata.
-  </p>
-
-  <div id="dataset-summary" class="dataset-summary">
-    Loading available datasets...
-  </div>
-
-  <form id="search-form">
-    <p>
-    <label for="search-mode">Search mode</label><br>
-      <select id="search-mode" name="mode">
-        <option value="keyword">Keyword</option>
-        <option value="semantic">Semantic</option>
-      </select>
-    </p>
-    <p>
-      <label for="dataset-select">Dataset</label><br>
-      <select id="dataset-select">
-        <option value="">All datasets</option>
-      </select>
-    </p>
+  <main class="page">
+    <h1>StatsFinder</h1>
 
     <p>
-      <label for="search-input">Search terms</label><br>
-      <input
-        id="search-input"
-        type="search"
-        value="real gdp"
-        placeholder="Try: real gdp, consumer price, retail price, imports"
-      >
-      <button type="submit">Search</button>
+      Search public ONS/IMF SDMX series metadata.
     </p>
-  </form>
 
-  <p class="muted">
-    This page calls the local FastAPI search endpoints. Semantic mode uses Google Gemini query embeddings and pgvector similarity search.
-    <span class="code">/v1/series/search</span>
-  </p>
+    <section class="search-hero">
+      <form id="search-form" class="search-form">
+        <label for="search-input" class="search-label">
+          Search statistical series
+        </label>
 
-  <div id="results"></div>
+        <div class="search-row">
+          <input
+            id="search-input"
+            class="search-input-large"
+            type="search"
+            value="real gdp"
+            placeholder="Try: real gdp, consumer prices, imports, population"
+          >
+          <button type="submit">Search</button>
+        </div>
+
+        <p class="search-help muted">
+          Semantic search is used by default across source-backed series metadata.
+        </p>
+
+        <label for="dataset-select">Dataset</label>
+        <select id="dataset-select">
+          <option value="">All datasets</option>
+        </select>
+      </form>
+    </section>
+
+    <div id="dataset-summary" class="dataset-summary">
+      Loading available datasets...
+    </div>
+
+    <p class="muted">
+      This page searches source-backed statistical series metadata. Semantic mode uses Google Gemini query embeddings and pgvector similarity search.
+      <span class="code">/v1/series/search</span>
+    </p>
+
+    <div id="results"></div>
+  </main>
 
   <script src="/static/utils.js?v=1"></script>
-  <script src="/static/app.js?v=5"></script>
+  <script src="/static/app.js?v=6"></script>
 
 </body>
 </html>

@@ -7,6 +7,8 @@ const referencesContainer = document.getElementById("chat-references");
 const debugContainer = document.getElementById("chat-debug");
 const submitButton = document.getElementById("chat-submit-button");
 
+let loadingDotsTimer = null;
+
 function formatScore(value) {
   const number = Number(value);
 
@@ -233,10 +235,42 @@ function renderDebug(debug) {
 }
 
 function setLoading(isLoading) {
-  if (submitButton) {
-    submitButton.disabled = isLoading;
-    submitButton.textContent = isLoading ? "Asking..." : "Ask";
+  if (!submitButton) {
+    return;
   }
+
+  submitButton.disabled = isLoading;
+
+  if (!isLoading) {
+    if (loadingDotsTimer) {
+      clearInterval(loadingDotsTimer);
+      loadingDotsTimer = null;
+    }
+
+    submitButton.textContent = "Ask";
+    return;
+  }
+
+  if (loadingDotsTimer) {
+    clearInterval(loadingDotsTimer);
+    loadingDotsTimer = null;
+  }
+
+  let dotCount = 0;
+
+  const updateLoadingText = () => {
+    const dots = ".".repeat(dotCount + 1);
+    submitButton.textContent = `Asking${dots}`;
+
+    if (answerContainer) {
+      answerContainer.textContent = `Thinking${dots}`;
+    }
+
+    dotCount = (dotCount + 1) % 3;
+  };
+
+  updateLoadingText();
+  loadingDotsTimer = setInterval(updateLoadingText, 450);
 }
 
 async function askChat() {
@@ -249,7 +283,6 @@ async function askChat() {
 
   const datasetId = datasetSelect.value || null;
 
-  answerContainer.textContent = "Thinking...";
   selectedSeriesContainer.innerHTML = "";
   referencesContainer.innerHTML = "";
   debugContainer.innerHTML = "";
