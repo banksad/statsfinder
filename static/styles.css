@@ -13,6 +13,14 @@
   --shadow: 0 1px 2px rgb(31 35 40 / 0.06);
   --radius: 0.75rem;
   --radius-small: 0.45rem;
+  --ons-night-blue: #003c57;
+  --ons-ocean-blue: #206095;
+  --ons-leaf-green: #0f8243;
+  --ons-ruby-red: #d0021b;
+  --ons-sun-yellow: #fbc900;
+  --ons-black: #222222;
+  --ons-grey-15: #e2e2e3;
+  --ons-grey-5: #f5f5f6;
 }
 
 * {
@@ -26,14 +34,9 @@ html {
 body {
   margin: 0;
   padding: 0 1rem 3rem;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   line-height: 1.5;
-  color: var(--text);
+  color: var(--ons-black);
   background: var(--background);
 }
 
@@ -49,7 +52,7 @@ body {
 }
 
 a {
-  color: var(--link);
+  color: var(--ons-ocean-blue);
   text-decoration: none;
 }
 
@@ -108,34 +111,42 @@ textarea {
   min-height: 7rem;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid rgb(9 105 218 / 0.25);
-  border-color: var(--link);
-}
-
-button {
+button,
+.sf-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  padding: 0.65rem 0.95rem;
-  border: 1px solid var(--border);
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border: 0;
   border-radius: var(--radius-small);
-  background: var(--text);
+  background: var(--ons-leaf-green);
   color: #ffffff;
+  font: inherit;
   font-weight: 700;
   cursor: pointer;
 }
 
-button:hover {
-  background: #32383f;
+button:hover,
+.sf-button:hover {
+  background: #0b5d30;
 }
 
 button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
+  cursor: wait;
+  opacity: 0.8;
+}
+
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+summary:focus {
+  outline: 3px solid var(--ons-sun-yellow);
+  outline-offset: 0;
+  box-shadow: 0 0 0 4px var(--ons-black);
 }
 
 label {
@@ -260,6 +271,61 @@ label {
 }
 
 /* Search and result cards */
+
+.search-hero {
+  margin: 2rem 0;
+  padding: 1.25rem;
+  background: var(--ons-grey-5);
+  border-left: 6px solid var(--ons-ocean-blue);
+}
+
+.search-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.search-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.search-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.search-input-large {
+  flex: 1;
+  min-height: 48px;
+  font-size: 1.15rem;
+}
+
+.search-help {
+  margin-bottom: 0;
+}
+
+.dataset-panel-collapsible {
+  padding: 0;
+}
+
+.dataset-panel-collapsible summary {
+  cursor: pointer;
+  padding: 1rem;
+  font-weight: 700;
+}
+
+.dataset-panel-collapsible summary .muted {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-weight: 400;
+}
+
+.dataset-panel-collapsible .dataset-grid {
+  padding: 0 1rem 1rem;
+}
 
 .result {
   background: var(--surface);
@@ -899,6 +965,15 @@ th {
 
   .inline-form-row {
     flex-direction: column;
+  }
+
+  .search-row {
+    flex-direction: column;
+  }
+
+  .search-input-large,
+  .search-row button {
+    width: 100%;
   }
 
   .metadata-list div {
